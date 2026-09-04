@@ -75,6 +75,8 @@ The worker attempts Google account selection only once per authentication incide
 
 In watch mode the worker also keeps the ArchersHub portal session alive every five minutes. It runs the portal's own read-only `POST /StudentLogin/ReFillSession/` endpoint inside the authenticated page context and updates the portal's existing `localStorage["IdleTime"]` marker. This is intended to prevent the portal's 10-minute inactivity warning and 2-minute logout while the worker is actively maintaining the session. It does not simulate mouse/keyboard input, touch the Google session, enter credentials, approve MFA, or navigate to the URL returned by the endpoint. If the keepalive returns login HTML, a redirect, or an error, normal ntfy state handling takes over.
 
+`ReFillSession` normally returns authenticated `StudentDashboard` HTML with HTTP 200 rather than JSON. That is a successful keepalive. Login-page HTML, unexpected HTML destinations, and non-2xx responses are failures. The captured Oracle log showed the old implementation falsely rejecting two valid dashboard responses; this case is now covered by regression tests.
+
 Expected output is similar to:
 
 ```text

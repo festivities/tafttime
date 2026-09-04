@@ -11,6 +11,19 @@ import type {
 
 export const COURSE_FINDER_PATH = "/CourseFinder/Index";
 
+export function isSuccessfulKeepaliveResponse(response: {
+  status: number;
+  url: string;
+  contentType: string;
+}): boolean {
+  if (response.status < 200 || response.status >= 300) return false;
+  if (isLoginUrl(response.url)) return false;
+  if (/text\/html/i.test(response.contentType)) {
+    return /\/studentdashboard(?:\/|$)/i.test(new URL(response.url).pathname);
+  }
+  return true;
+}
+
 export async function keepArchersHubSessionAlive(
   page: Page,
   logger?: DiagnosticLogger
@@ -38,12 +51,7 @@ export async function keepArchersHubSessionAlive(
     durationMs: Date.now() - started,
   });
 
-  if (
-    isLoginUrl(response.url) ||
-    /text\/html/i.test(response.contentType) ||
-    response.status < 200 ||
-    response.status >= 300
-  ) {
+  if (!isSuccessfulKeepaliveResponse(response)) {
     throw new Error("AUTHENTICATION_REQUIRED: session keepalive failed");
   }
 }
