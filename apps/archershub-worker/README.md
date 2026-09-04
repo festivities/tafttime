@@ -42,6 +42,31 @@ npm run start -- \
 
 The worker clicks ArchersHub's real `Continue with Google` element and selects the matching account in Google's chooser. It does not enter a password or approve phone MFA. If either is requested, complete it manually in Chrome. The worker waits for the authenticated ArchersHub dashboard before fetching Course Finder data.
 
+## Watch Mode And ntfy
+
+Watch mode is opt-in and keeps retrying without writing application data:
+
+```sh
+export NTFY_TOPIC=your-private-topic
+npm run start -- \
+  --watch \
+  --interval-seconds 900 \
+  --cdp http://127.0.0.1:9222 \
+  --course STSWENG \
+  --login \
+  --google-account jose_edgardo_valle@dlsu.edu.ph
+```
+
+`NTFY_TOPIC` is optional in development but should be set for unattended operation. Optional settings are `NTFY_SERVER` (defaults to `https://ntfy.sh`) and `NTFY_TOKEN` for an authenticated ntfy topic. Use a private, unguessable topic and do not put the topic or token in source control. If using a self-hosted ntfy server, set `NTFY_SERVER` to its HTTPS URL.
+
+The worker sends one notification when it enters a new state:
+
+- `WAITING_FOR_REAUTHENTICATION`: connect through RDP, complete Google sign-in/MFA manually, and leave Chrome running.
+- `PROVIDER_UNAVAILABLE`: Chrome or ArchersHub is unavailable; the worker retries.
+- Recovery: Course Finder is authenticated again.
+
+The worker attempts Google account selection only once per authentication incident. After that it pauses login attempts while polling, so inconsistent Google phone notifications do not cause repeated OAuth requests. `--watch` without `--login` is valid and will alert on expiry while waiting for manual recovery; rerun with `--login` when account selection must be automated.
+
 Expected output is similar to:
 
 ```text

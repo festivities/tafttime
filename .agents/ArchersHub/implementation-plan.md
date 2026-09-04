@@ -90,3 +90,11 @@ Only `AUTHENTICATED` may run the catalog pull. `EXPIRED` pauses pulls and alerts
 - A fresh profile requires interactive sign-in.
 - Request concurrency and retry behavior stay within an agreed provider-safe limit.
 - No test output contains cookie values, authorization headers, or personal data.
+
+## First Worker Implementation
+
+The first read-only worker milestone is implemented at `apps/archershub-worker`. It attaches to the `desktop` user's Chrome over localhost CDP, optionally clicks the real Google flow, validates Course Finder responses, and prints safe metadata. It has no MongoDB, Redis, GraphQL, or enrollment side effects.
+
+Watch mode is available with `--watch`. It polls at 900 seconds by default, configurable with `--interval-seconds`. Set `NTFY_TOPIC` for unattended alerts; `NTFY_SERVER` and `NTFY_TOKEN` are optional. The worker sends state-change notifications for authentication-required, provider/Chrome unavailable, and recovery. It attempts Google account selection once per authentication incident and then stops initiating login attempts until the incident clears.
+
+The worker never calls `browser.close()` after CDP attachment. The attached browser belongs to `desktop` and must remain available for RDP-based manual reauthentication.

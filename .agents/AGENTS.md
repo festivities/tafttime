@@ -342,6 +342,8 @@ The login automation took several iterations and these details are important. Th
 
 The verified milestone sequence was: after logout, the login page visibly displayed `Continue with Google`; clicking it reached Google's account chooser; selecting the already-authenticated university account returned to `https://archershub.dlsu.edu.ph/StudentDashboard`; Course Finder then returned 2,772 live offerings, `STSWENG` resolved to course ID `367`, and `GetCFData` returned 6 class rows. The count is live and must not be hardcoded. Do not automate Google credential entry, CAPTCHA solving, or phone approval.
 
+The worker now has opt-in unattended watch mode: `npm run start --workspace=archershub-worker -- --watch --interval-seconds 900`. Set `NTFY_TOPIC` for ntfy alerts, with optional `NTFY_SERVER` and `NTFY_TOKEN`. It distinguishes `WAITING_FOR_REAUTHENTICATION` from `PROVIDER_UNAVAILABLE`, sends notifications only on state changes plus recovery, attempts Google account selection once per authentication incident, and then waits rather than repeatedly initiating OAuth while phone notifications are unreliable. Manual recovery is performed in the `desktop` user's XFCE/RDP Chrome session; after approval, the worker resumes when its authenticated probe succeeds. The worker must never automate Google passwords or MFA, and must never call `browser.close()` on the attached desktop-owned Chrome process.
+
 ## Source Of Truth Priority
 
 When documentation conflicts, use this order:

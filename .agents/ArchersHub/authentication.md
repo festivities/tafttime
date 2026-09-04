@@ -130,3 +130,9 @@ Reuse Crossbow's proven browser attachment and profile handling concepts, especi
 - Bounded waits and a manual fallback.
 
 Do not carry the OCR CAPTCHA or Gmail OTP automation into the preferred path. Keep it only as a legacy emergency path if the account owner explicitly wants it and policy permits it. The Google flow should remain human-driven.
+
+## Unattended Operation
+
+The first worker milestone supports ntfy notifications and a supervised watch loop. Configure a private topic through `NTFY_TOPIC`; use `NTFY_TOKEN` for a protected topic or `NTFY_SERVER` for a self-hosted HTTPS server. Alerts contain only state and safe counts/messages, never cookies, authorization headers, OAuth URLs, or page dumps.
+
+When authentication expires, the worker enters `WAITING_FOR_REAUTHENTICATION`, sends one incident notification, and does not repeatedly click through Google. Connect to the `desktop` XFCE session over RDP, complete the visible Google flow and any password/phone approval manually, leave Chrome running, and let the worker detect recovery. The worker's CDP connection is read-only with respect to browser ownership: it must not close the attached Chrome process.
