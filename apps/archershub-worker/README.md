@@ -42,6 +42,8 @@ npm run start -- \
 
 The worker clicks ArchersHub's real `Continue with Google` element and selects the matching account in Google's chooser. It does not enter a password or approve phone MFA. If either is requested, complete it manually in Chrome. The worker waits for the authenticated ArchersHub dashboard before fetching Course Finder data.
 
+During Google authentication, the worker inspects only the rendered Google prompt text. If it sees the simple Gmail approval prompt, it sends an ntfy approval alert. If it sees the number-matching prompt (`Open the Gmail app ... then tap N on your phone ...`), it sends the required number in the ntfy title and message. Each distinct prompt is sent once per login attempt; the worker never reads or stores passwords, tokens, cookies, or other page text.
+
 The Google chooser/callback may use a different tab from the original ArchersHub login tab. The worker therefore scans all pages attached to the CDP browser for an authenticated ArchersHub dashboard/Course Finder marker after account selection. Seeing the original ArchersHub login tab remain open during OAuth is normal; the callback tab is the page that matters.
 
 The authenticated callback page must be assigned back to the worker's active page reference. If the original login page is reused after the callback, the next Course Finder navigation sends that tab back to login and makes a successful Google sign-in appear to fail. The worker now preserves the callback page and retries Course Finder navigation briefly while the server-side session settles.

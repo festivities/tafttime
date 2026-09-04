@@ -2,6 +2,23 @@ import type { BrowserContext, Page } from "playwright";
 
 export const ARCHERSHUB_ORIGIN = "https://archershub.dlsu.edu.ph";
 
+export type MfaPrompt =
+  | { kind: "number_match"; number: string }
+  | { kind: "approval" };
+
+export function parseMfaPrompt(text: string): MfaPrompt | undefined {
+  const numberMatch = text.match(
+    /Open the Gmail app,\s*tap Yes on the prompt,\s*then tap\s+(\d+)\s+on your phone to verify it(?:’|'|)s you/i
+  );
+  if (numberMatch) return { kind: "number_match", number: numberMatch[1] };
+
+  if (/open the gmail app.*tap yes on the prompt/i.test(text)) {
+    return { kind: "approval" };
+  }
+
+  return undefined;
+}
+
 export function isLoginUrl(url: string): boolean {
   const parsed = new URL(url);
   return (
@@ -28,11 +45,13 @@ export async function completeGoogleSignIn(
   context: BrowserContext,
   initialPage: Page,
   account: string,
+  onMfaPrompt?: (prompt: MfaPrompt) => Promise<void>,
   timeoutMs = 5 * 60_000
 ): Promise<Page> {
   const deadline = Date.now() + timeoutMs;
   let page = initialPage;
   let accountSelected = false;
+  let notifiedMfa: string | undefined;
 
   while (Date.now() < deadline) {
     const authenticatedPage = await findAuthenticatedPage(context);
@@ -61,6 +80,19 @@ export async function completeGoogleSignIn(
           accountEntry.click(),
         ]);
         accountSelected = true;
+      }
+    }
+
+    if (googlePage && onMfaPrompt) {
+      const prompt = parseMfaPrompt(await page.locator("body").innerText());
+      const promptKey = prompt
+        ? prompt.kind === "number_match"
+          ? `${prompt.kind}:${prompt.number}`
+          : prompt.kind
+        : undefined;
+      if (prompt && promptKey !== notifiedMfa) {
+        await onMfaPrompt(prompt);
+        notifiedMfa = promptKey;
       }
     }
 

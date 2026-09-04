@@ -4,6 +4,7 @@ import {
   ARCHERSHUB_ORIGIN,
   completeGoogleSignIn,
   isAuthenticatedPage,
+  type MfaPrompt,
 } from "./authentication";
 import { fetchCourseFinder } from "./course-finder";
 import { createNtfyNotifier, notifySafely, type Notifier } from "./notifier";
@@ -45,7 +46,8 @@ async function runOnce(
   cdp: string,
   coursePrefix: string,
   login: boolean,
-  account: string
+  account: string,
+  notify: Notifier
 ): Promise<{ courses: number; classes: number }> {
   const { context } = await connectPage(cdp);
   let page = context.pages()[0] ?? (await context.newPage());
@@ -65,7 +67,9 @@ async function runOnce(
       console.log("Clicking Continue with Google.");
       console.log("Complete any password or phone approval in Chrome if prompted.");
       await googleButton.click();
-      page = await completeGoogleSignIn(context, page, account);
+      page = await completeGoogleSignIn(context, page, account, async (prompt) => {
+        await notifyMfaPrompt(notify, prompt);
+      });
     }
 
     const result = await fetchCourseFinder(page, coursePrefix);
@@ -85,6 +89,26 @@ async function runOnce(
   }
 }
 
+async function notifyMfaPrompt(
+  notify: Notifier,
+  prompt: MfaPrompt
+): Promise<void> {
+  if (prompt.kind === "number_match") {
+    await notifySafely(
+      notify,
+      `TaftTime: Google number matching required (${prompt.number})`,
+      `Open the Gmail app, tap Yes on the sign-in prompt, then tap ${prompt.number} on your phone. The worker is waiting for ArchersHub authentication.`
+    );
+    return;
+  }
+
+  await notifySafely(
+    notify,
+    "TaftTime: Google approval required",
+    "Open the Gmail app and tap Yes on the sign-in prompt. The worker is waiting for ArchersHub authentication."
+  );
+}
+
 async function runWatch(
   cdp: string,
   coursePrefix: string,
@@ -102,7 +126,8 @@ async function runWatch(
         cdp,
         coursePrefix,
         login && !loginAttemptedForIncident,
-        account
+        account,
+        notify
       );
       if (state !== "AUTHENTICATED") {
         await notifySafely(
@@ -163,7 +188,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  await runOnce(cdp, coursePrefix, login, account);
+  await runOnce(cdp, coursePrefix, login, account, notify);
   console.log("Probe completed without modifying the attached browser.");
 }
 
