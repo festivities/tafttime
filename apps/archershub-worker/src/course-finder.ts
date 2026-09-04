@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 
-import { ARCHERSHUB_ORIGIN, isAuthenticatedPage, isLoginUrl } from "./authentication";
+import { ARCHERSHUB_ORIGIN, isLoginUrl } from "./authentication";
 import type { DiagnosticLogger } from "./logger";
 import type {
   ClassRow,
@@ -160,10 +160,21 @@ export async function fetchCourseFinder(
     await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(
       () => undefined
     );
-    if (await isAuthenticatedPage(page)) {
+    if (isLoginUrl(page.url())) break;
+    try {
+      await page.locator("#ddlSelectCampus").waitFor({
+        state: "attached",
+        timeout: 5_000,
+      });
+      await page.locator("#ddlSelectAcadSession").waitFor({
+        state: "attached",
+        timeout: 5_000,
+      });
       logger?.info("course_finder.authenticated", { attempt });
       authenticated = true;
       break;
+    } catch {
+      // The controls can arrive after the document and network settle.
     }
     if (attempt < 3) await page.waitForTimeout(2_000);
   }
