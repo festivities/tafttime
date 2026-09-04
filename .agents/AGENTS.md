@@ -319,6 +319,29 @@ Many current identifiers remain `berkeleytime`, `bt`, `bt.sid`, Berkeley domains
 
 Keep provider-specific code at the boundary. The frontend should consume normalized GraphQL data and should not call a university SIS directly.
 
+## ArchersHub Integration
+
+Detailed ArchersHub research lives in `.agents/ArchersHub/`. Read it before implementing TaftTime's DLSU provider integration.
+
+The current provider investigation verified that authenticated Course Finder browser requests use:
+
+- `POST https://archershub.dlsu.edu.ph/CourseFinder/GetCourseList/` with URL-encoded `Campusno` and `AcademicSession`, returning `CourseDrp` records containing `COURSE_CREATION_ID` and `COURSE_NAME`.
+- `POST https://archershub.dlsu.edu.ph/CourseFinder/GetCFData/` with URL-encoded `Campusno`, `AcademicSession`, and `Courseid`, returning a JSON array of selectable class/section rows. `STSWENG` (course ID `367`) returned 6 rows in the inspected session. Observed row fields include `SESSION`, `CAMPUS`, `COURSE_CREATION_ID`, `SECTION_CREATION_ID`, `SECTION_NAME`, `CAPACITY`, `UPDATED_CAPACITY`, `SUBJECT_NAME`, `SUBJECT_TYPE`, `CREDITS`, `MAIN_TEACHER`, `ADDITIONAL_TEACHER`, `SCHEDULE`, `ENLISTED`, `APPROVED_COUNT`, `START_DATE`, `END_DATE`, `BATCH_CREATION_ID`, `SECTION_REMARK`, `ROOOMNAME`, and `BATCHNAME`.
+
+Both endpoints require the authenticated ArchersHub browser session. The session cookie is not available through `document.cookie` because authentication state is HttpOnly or otherwise browser-managed. Do not copy local-PC cookies or Chrome profiles into production as the primary design: browser cookies may be OS-encrypted, server-side sessions may be device/IP-bound or expire independently, and copied cookies are bearer credentials. Do not put them in TaftTime configuration, logs, MongoDB, Redis, CI artifacts, or GraphQL.
+
+The preferred design is a dedicated persistent Chromium/Playwright or Selenium worker on the Oracle host. A human performs the one-time `Continue with Google` sign-in in that host's browser profile; the worker then makes the Course Finder requests through the same context. Google credential entry, CAPTCHA solving, and 2FA bypass must not be automated. On redirect-to-login, 401/403, or a confirmed expired-session response, pause ingestion and alert for human reauthentication rather than retrying indefinitely.
+
+Keep this provider-specific browser boundary separate from the public backend. Normalize responses in the datapuller/provider adapter into the existing shared models, use bounded concurrency and rate limits, retain source IDs and retrieval timestamps, validate responses, and prevent incomplete runs from replacing complete catalog data. The expected session lifetime is currently unknown; measure it with redacted login/probe timestamps and failure metrics rather than assuming a TTL.
+
+The first implementation milestone is now in `apps/archershub-worker`. It is a private, read-only TypeScript package that attaches to Chrome over localhost CDP, optionally clicks the real ArchersHub `Continue with Google` control, selects the configured Google account, waits for the OAuth callback/dashboard to finish loading, and reads Course Finder data. Run its `npm test`, `npm run type-check`, and `npm run lint` scripts from the workspace root with `--workspace=archershub-worker`.
+
+The worker deliberately does not own or read the `desktop` user's Chrome profile, export cookies, serialize Playwright storage state, enter Google passwords, approve phone MFA, write MongoDB, modify enrollment, or expose an API. Chrome remains a separate `desktop`-owned process with CDP bound to `127.0.0.1:9222`; the `tafttime` worker attaches to it. A current valid session can run without `--login`. After session expiry, run with `--login --google-account <university-email>` and complete any password or phone approval manually in the visible Chrome/RDP session.
+
+The login automation took several iterations and these details are important. The original probe only checked for `/StudentLogin`, but the logged-out page is the ArchersHub root `/`, so it incorrectly treated the login page as authenticated. The Google chooser opens in a separate `accounts.google.com` page, so the worker must scan all CDP-attached pages instead of continuing with the original ArchersHub page. The account entry needs to be loaded, scrolled into view, and given a short settling delay before the click. Selecting the account can return briefly to `/StudentDashboard` before dashboard content exists; authentication is therefore confirmed by real dashboard/Course Finder markers and settled page state, not URL alone. The worker also waits for the OAuth callback and network/page loading before requesting Course Finder.
+
+The verified milestone sequence was: after logout, the login page visibly displayed `Continue with Google`; clicking it reached Google's account chooser; selecting the already-authenticated university account returned to `https://archershub.dlsu.edu.ph/StudentDashboard`; Course Finder then returned 2,772 live offerings, `STSWENG` resolved to course ID `367`, and `GetCFData` returned 6 class rows. The count is live and must not be hardcoded. Do not automate Google credential entry, CAPTCHA solving, or phone approval.
+
 ## Source Of Truth Priority
 
 When documentation conflicts, use this order:

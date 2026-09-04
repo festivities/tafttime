@@ -1,0 +1,24 @@
+{
+  "name": "archershub-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "lint": "eslint src/",
+    "type-check": "tsc --noEmit --incremental false"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "@types/node": "^24.7.0",
+    "eslint": "^9.39.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

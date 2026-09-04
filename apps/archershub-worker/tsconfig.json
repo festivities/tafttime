@@ -1,0 +1,7 @@
+{
+  "extends": "@repo/typescript-config/node.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM"]
+  },
+  "include": ["src"]
+}
