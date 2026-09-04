@@ -1,6 +1,7 @@
 import type { Page } from "playwright";
 
 import { ARCHERSHUB_ORIGIN, isAuthenticatedPage, isLoginUrl } from "./authentication";
+import type { DiagnosticLogger } from "./logger";
 import type {
   ClassRow,
   Course,
@@ -13,8 +14,11 @@ export const COURSE_FINDER_PATH = "/CourseFinder/Index";
 export async function postForm<T>(
   page: Page,
   path: string,
-  form: Record<string, string>
+  form: Record<string, string>,
+  logger?: DiagnosticLogger
 ): Promise<T> {
+  const started = Date.now();
+  logger?.debug("provider.request", { path });
   const response = await page.evaluate(
     async ({ path, form }) => {
       const result = await fetch(path, {
@@ -36,15 +40,33 @@ export async function postForm<T>(
   );
 
   if (isLoginUrl(response.url) || /text\/html/i.test(response.contentType)) {
+    logger?.warn("provider.authentication_required", {
+      path,
+      status: response.status,
+      contentType: response.contentType,
+      durationMs: Date.now() - started,
+    });
     throw new Error("AUTHENTICATION_REQUIRED: ArchersHub returned the login page");
   }
   if (response.status < 200 || response.status >= 300) {
+    logger?.warn("provider.http_error", {
+      path,
+      status: response.status,
+      durationMs: Date.now() - started,
+    });
     throw new Error(`PROVIDER_ERROR: ${path} returned HTTP ${response.status}`);
   }
 
   try {
+    logger?.info("provider.response", {
+      path,
+      status: response.status,
+      durationMs: Date.now() - started,
+      bodyBytes: response.text.length,
+    });
     return JSON.parse(response.text) as T;
   } catch {
+    logger?.error("provider.invalid_json", { path });
     throw new Error(`INVALID_RESPONSE: ${path} did not return JSON`);
   }
 }
@@ -79,7 +101,8 @@ export function validateClassRows(value: unknown): ClassRow[] {
 
 export async function fetchCourseFinder(
   page: Page,
-  coursePrefix: string
+  coursePrefix: string,
+  logger?: DiagnosticLogger
 ): Promise<CourseFinderResult> {
   // OAuth can render the dashboard before the server-side session is ready.
   // Retry navigation without starting another OAuth flow.
@@ -92,6 +115,7 @@ export async function fetchCourseFinder(
       () => undefined
     );
     if (await isAuthenticatedPage(page)) {
+      logger?.info("course_finder.authenticated", { attempt });
       authenticated = true;
       break;
     }
@@ -121,7 +145,7 @@ export async function fetchCourseFinder(
     await postForm<CourseListResponse>(page, "/CourseFinder/GetCourseList/", {
       Campusno: selection.campus,
       AcademicSession: selection.academicSession,
-    })
+    }, logger)
   );
   const matchedCourse = list.find((course) =>
     course.COURSE_NAME.toUpperCase().startsWith(coursePrefix.toUpperCase())
@@ -135,7 +159,7 @@ export async function fetchCourseFinder(
       Campusno: selection.campus,
       AcademicSession: selection.academicSession,
       Courseid: String(matchedCourse.COURSE_CREATION_ID),
-    })
+    }, logger)
   );
 
   return {

@@ -9,6 +9,7 @@ import {
 import { fetchCourseFinder } from "./course-finder";
 import { createNtfyNotifier, notifySafely, type Notifier } from "./notifier";
 import { errorCategory, type WorkerState } from "./state";
+import { createDiagnosticLogger, type DiagnosticLogger } from "./logger";
 
 function argument(name: string, fallback: string): string {
   const index = process.argv.indexOf(`--${name}`);
@@ -47,7 +48,8 @@ async function runOnce(
   coursePrefix: string,
   login: boolean,
   account: string,
-  notify: Notifier
+  notify: Notifier,
+  logger: DiagnosticLogger
 ): Promise<{ courses: number; classes: number }> {
   const { context } = await connectPage(cdp);
   let page = context.pages()[0] ?? (await context.newPage());
@@ -69,10 +71,10 @@ async function runOnce(
       await googleButton.click();
       page = await completeGoogleSignIn(context, page, account, async (prompt) => {
         await notifyMfaPrompt(notify, prompt);
-      });
+      }, 5 * 60_000, logger);
     }
 
-    const result = await fetchCourseFinder(page, coursePrefix);
+    const result = await fetchCourseFinder(page, coursePrefix, logger);
     const sections = result.classes
       .map((row) => row.SECTION_NAME)
       .filter((section): section is string => typeof section === "string");
@@ -115,7 +117,8 @@ async function runWatch(
   login: boolean,
   account: string,
   intervalMs: number,
-  notify: Notifier
+  notify: Notifier,
+  logger: DiagnosticLogger
 ): Promise<never> {
   let state: WorkerState | undefined;
   let loginAttemptedForIncident = false;
@@ -127,7 +130,8 @@ async function runWatch(
         coursePrefix,
         login && !loginAttemptedForIncident,
         account,
-        notify
+        notify,
+        logger
       );
       if (state !== "AUTHENTICATED") {
         await notifySafely(
@@ -141,7 +145,15 @@ async function runWatch(
     } catch (error) {
       const nextState = errorCategory(error);
       console.error(`[${nextState}] ${safeError(error)}`);
+      logger.error("worker.error", {
+        state: nextState,
+        message: safeError(error),
+      });
       if (nextState !== state) {
+        logger.info("worker.state_change", {
+          from: state ?? "STARTING",
+          to: nextState,
+        });
         const message =
           nextState === "WAITING_FOR_REAUTHENTICATION"
             ? "ArchersHub needs authentication. Connect through RDP, complete Continue with Google and any password/phone approval, then leave Chrome running."
@@ -164,6 +176,15 @@ async function main(): Promise<void> {
   const account = argument("google-account", process.env.GOOGLE_ACCOUNT ?? "");
   const login = hasFlag("login");
   const watch = hasFlag("watch");
+  const logger = createDiagnosticLogger(
+    argument("log-dir", process.env.ARCHERSHUB_LOG_DIR ?? "") || undefined
+  );
+  logger.info("worker.start", {
+    mode: watch ? "watch" : "once",
+    cdp,
+    coursePrefix,
+    intervalSeconds: numberArgument("interval-seconds", 900),
+  });
 
   if (login && !account) {
     throw new Error(
@@ -183,12 +204,13 @@ async function main(): Promise<void> {
       login,
       account,
       numberArgument("interval-seconds", 900) * 1000,
-      notify
+      notify,
+      logger
     );
     return;
   }
 
-  await runOnce(cdp, coursePrefix, login, account, notify);
+  await runOnce(cdp, coursePrefix, login, account, notify, logger);
   console.log("Probe completed without modifying the attached browser.");
 }
 

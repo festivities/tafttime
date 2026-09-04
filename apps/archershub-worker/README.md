@@ -89,6 +89,25 @@ Probe completed without modifying the attached browser.
 
 Counts and sections are live data and can change.
 
+## Diagnostic Logging
+
+Enable secret-safe JSONL logs with `--log-dir` or `ARCHERSHUB_LOG_DIR`:
+
+```sh
+mkdir -p /var/log/tafttime/archershub
+npm run start -- \
+  --watch \
+  --log-dir /var/log/tafttime/archershub \
+  --cdp http://127.0.0.1:9222 \
+  --course STSWENG \
+  --login \
+  --google-account jose_edgardo_valle@dlsu.edu.ph
+```
+
+Each run creates one `archershub-*.jsonl` file. Events include worker startup, CDP page counts, Google-page discovery, account selection, MFA prompt kind and number, authentication completion, endpoint status/timing/response size, state transitions, and errors. URLs are logged without query strings. Request forms and response bodies are never logged. The directory is created with mode `700` and files with mode `600` where supported.
+
+The logger is opt-in. Without `--log-dir` or `ARCHERSHUB_LOG_DIR`, no diagnostic file is created. Keep logs on the Oracle host, restrict access to `tafttime`, and rotate/delete them according to your retention policy.
+
 ## Failure Categories
 
 - `AUTHENTICATION_REQUIRED`: reauthenticate manually in Chrome or rerun with `--login`.

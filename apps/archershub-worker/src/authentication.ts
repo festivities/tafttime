@@ -1,5 +1,7 @@
 import type { BrowserContext, Page } from "playwright";
 
+import type { DiagnosticLogger } from "./logger";
+
 export const ARCHERSHUB_ORIGIN = "https://archershub.dlsu.edu.ph";
 
 export type MfaPrompt =
@@ -46,7 +48,8 @@ export async function completeGoogleSignIn(
   initialPage: Page,
   account: string,
   onMfaPrompt?: (prompt: MfaPrompt) => Promise<void>,
-  timeoutMs = 5 * 60_000
+  timeoutMs = 5 * 60_000,
+  logger?: DiagnosticLogger
 ): Promise<Page> {
   const deadline = Date.now() + timeoutMs;
   let page = initialPage;
@@ -54,13 +57,20 @@ export async function completeGoogleSignIn(
   let notifiedMfa: string | undefined;
 
   while (Date.now() < deadline) {
+    logger?.debug("auth.poll", { pages: context.pages().length });
     const authenticatedPage = await findAuthenticatedPage(context);
-    if (authenticatedPage) return authenticatedPage;
+    if (authenticatedPage) {
+      logger?.info("auth.authenticated", { url: authenticatedPage.url() });
+      return authenticatedPage;
+    }
 
     const googlePage = context.pages().find((candidate) =>
       candidate.url().startsWith("https://accounts.google.com/")
     );
-    if (googlePage) page = googlePage;
+    if (googlePage) {
+      page = googlePage;
+      logger?.debug("auth.google_page", { url: page.url() });
+    }
 
     if (googlePage && !accountSelected) {
       await page.waitForLoadState("domcontentloaded").catch(() => undefined);
@@ -75,6 +85,7 @@ export async function completeGoogleSignIn(
         await accountEntry.scrollIntoViewIfNeeded();
         await page.waitForTimeout(750);
         console.log("Selecting the configured Google account.");
+        logger?.info("auth.google_account_selected", { account });
         await Promise.all([
           page.waitForLoadState("domcontentloaded").catch(() => undefined),
           accountEntry.click(),
@@ -91,6 +102,10 @@ export async function completeGoogleSignIn(
           : prompt.kind
         : undefined;
       if (prompt && promptKey !== notifiedMfa) {
+        logger?.info("auth.mfa_prompt", {
+          kind: prompt.kind,
+          ...(prompt.kind === "number_match" ? { number: prompt.number } : {}),
+        });
         await onMfaPrompt(prompt);
         notifiedMfa = promptKey;
       }
