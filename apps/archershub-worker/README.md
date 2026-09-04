@@ -58,9 +58,9 @@ npm run start -- \
   --watch \
   --interval-seconds 900 \
   --cdp http://127.0.0.1:9222 \
-  --course STSWENG \
+  --course LASARE1 \
   --login \
-  --google-account jose_edgardo_valle@dlsu.edu.ph
+  --google-account example@dlsu.edu.ph
 ```
 
 `NTFY_TOPIC` is optional in development but should be set for unattended operation. Optional settings are `NTFY_SERVER` (defaults to `https://ntfy.sh`) and `NTFY_TOKEN` for an authenticated ntfy topic. Use a private, unguessable topic and do not put the topic or token in source control. If using a self-hosted ntfy server, set `NTFY_SERVER` to its HTTPS URL.

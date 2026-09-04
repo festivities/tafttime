@@ -144,3 +144,11 @@ The worker must also retain the returned authenticated `Page` object. Reusing th
 The worker recognizes two observed Google MFA prompts. It sends an ntfy alert for the simple Gmail `tap Yes` approval and sends a high-priority alert containing the number for the number-matching prompt (`Open the Gmail app, tap Yes on the prompt, then tap N on your phone to verify it's you`). It sends each distinct prompt once per login attempt and waits for the human phone action; it does not automate either MFA action.
 
 The worker supports opt-in secret-safe JSONL diagnostics with `--log-dir` or `ARCHERSHUB_LOG_DIR`. These logs record page transitions/counts, account-selection progress, MFA prompt type/number, endpoint status/timing/body size, and state transitions. Query strings, request forms, response bodies, cookies, OAuth values, and passwords are not logged.
+
+## First Watch-Mode Observation
+
+The first Oracle watch log (`archershub-2026-09-04T17-11-51-017Z.jsonl`) covered two successful 15-minute polls. Both polls fetched `GetCourseList` and `GetCFData` successfully. The second poll nevertheless opened Google's account chooser, selected the configured account, returned to ArchersHub, and completed without an MFA prompt. This indicates that ArchersHub's session can require a fresh OAuth round-trip even when Google does not require password or phone approval.
+
+No ntfy message during that second poll was expected under the current policy: notifications are emitted for an MFA prompt, a failed `WAITING_FOR_REAUTHENTICATION`/`PROVIDER_UNAVAILABLE` state transition, and recovery from a failed state. A reauthentication flow that completes automatically is silent. The log also confirms the 15-minute interval (`17:12` to `17:27`) and successful response sizes/statuses without exposing response bodies.
+
+The inactivity countdown observed in the browser is a separate portal-side activity timeout and may explain the ArchersHub session reset. It is not yet known when its prompt appears or whether a background Course Finder request resets it. The worker must not synthesize user activity or auto-dismiss the portal's warning until that behavior is measured; first capture its text, timing, and resulting network request in a controlled read-only observation.

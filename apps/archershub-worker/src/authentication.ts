@@ -85,7 +85,7 @@ export async function completeGoogleSignIn(
         await accountEntry.scrollIntoViewIfNeeded();
         await page.waitForTimeout(750);
         console.log("Selecting the configured Google account.");
-        logger?.info("auth.google_account_selected", { account });
+        logger?.info("auth.google_account_selected");
         await Promise.all([
           page.waitForLoadState("domcontentloaded").catch(() => undefined),
           accountEntry.click(),
