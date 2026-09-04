@@ -3,7 +3,6 @@ import { chromium, type Browser, type BrowserContext, type Page } from "playwrig
 import {
   ARCHERSHUB_ORIGIN,
   completeGoogleSignIn,
-  isAuthenticatedPage,
   type MfaPrompt,
 } from "./authentication";
 import { fetchCourseFinder, keepArchersHubSessionAlive } from "./course-finder";
@@ -53,31 +52,33 @@ async function runOnce(
 ): Promise<{ courses: number; classes: number; page: Page }> {
   const { context } = await connectPage(cdp);
   let page = context.pages()[0] ?? (await context.newPage());
-  {
-    await page.goto(`${ARCHERSHUB_ORIGIN}/CourseFinder/Index`, {
-      waitUntil: "domcontentloaded",
-    });
-    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(
-      () => undefined
-    );
-
-    if (!(await isAuthenticatedPage(page))) {
-      if (!login) {
-        throw new Error(
-          "AUTHENTICATION_REQUIRED: use --login to click Continue with Google"
-        );
-      }
-      const googleButton = page.locator("#btnGoogleSignIn");
-      await googleButton.waitFor({ state: "visible", timeout: 15_000 });
-      console.log("Clicking Continue with Google.");
-      console.log("Complete any password or phone approval in Chrome if prompted.");
-      await googleButton.click();
-      page = await completeGoogleSignIn(context, page, account, async (prompt) => {
-        await notifyMfaPrompt(notify, prompt);
-      }, 5 * 60_000, logger);
+  try {
+    const result = await fetchCourseFinder(page, coursePrefix, logger);
+    return logResult(result, page);
+  } catch (error) {
+    if (!login || !(error instanceof Error) || !error.message.includes("AUTHENTICATION_REQUIRED")) {
+      throw error;
     }
 
+    await page.goto(`${ARCHERSHUB_ORIGIN}/`, { waitUntil: "domcontentloaded" });
+    const googleButton = page.locator("#btnGoogleSignIn");
+    await googleButton.waitFor({ state: "visible", timeout: 15_000 });
+    console.log("Clicking Continue with Google.");
+    console.log("Complete any password or phone approval in Chrome if prompted.");
+    await googleButton.click();
+    page = await completeGoogleSignIn(context, page, account, async (prompt) => {
+      await notifyMfaPrompt(notify, prompt);
+    }, 5 * 60_000, logger);
+
     const result = await fetchCourseFinder(page, coursePrefix, logger);
+    return logResult(result, page);
+  }
+}
+
+function logResult(
+  result: Awaited<ReturnType<typeof fetchCourseFinder>>,
+  page: Page
+): { courses: number; classes: number; page: Page } {
     const sections = result.classes
       .map((row) => row.SECTION_NAME)
       .filter((section): section is string => typeof section === "string");
@@ -91,7 +92,6 @@ async function runOnce(
     console.log(`Selectable classes: ${result.classes.length}`);
     console.log(`Sections: ${sections.join(", ") || "none"}`);
     return { courses: result.courses.length, classes: result.classes.length, page };
-  }
 }
 
 async function notifyMfaPrompt(
@@ -150,7 +150,7 @@ async function runWatch(
       .finally(() => {
         keepAliveInFlight = false;
       });
-  }, 5 * 60 * 1000);
+  }, 4 * 60 * 1000);
 
   for (;;) {
     try {

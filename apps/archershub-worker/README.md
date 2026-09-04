@@ -77,7 +77,7 @@ In watch mode the worker also keeps the ArchersHub portal session alive every fi
 
 `ReFillSession` normally returns authenticated `StudentDashboard` HTML with HTTP 200 rather than JSON. That is a successful keepalive. Login-page HTML, unexpected HTML destinations, and non-2xx responses are failures. The captured Oracle log showed the old implementation falsely rejecting two valid dashboard responses; this case is now covered by regression tests.
 
-The keepalive also dispatches a non-visible `mousemove` DOM event because ArchersHub's inactivity plugin resets its internal timer from input events; changing `localStorage["IdleTime"]` alone is insufficient. It does not move the OS cursor or interact with Google.
+The keepalive also sends a tiny Playwright mouse move inside the browser page because ArchersHub's inactivity plugin resets its internal timer from input events; changing `localStorage["IdleTime"]` alone is insufficient. This affects only the browser page, does not move your physical mouse, and does not interact with Google.
 
 Expected output is similar to:
 
