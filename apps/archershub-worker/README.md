@@ -42,6 +42,8 @@ npm run start -- \
 
 The worker clicks ArchersHub's real `Continue with Google` element and selects the matching account in Google's chooser. It does not enter a password or approve phone MFA. If either is requested, complete it manually in Chrome. The worker waits for the authenticated ArchersHub dashboard before fetching Course Finder data.
 
+The Google chooser/callback may use a different tab from the original ArchersHub login tab. The worker therefore scans all pages attached to the CDP browser for an authenticated ArchersHub dashboard/Course Finder marker after account selection. Seeing the original ArchersHub login tab remain open during OAuth is normal; the callback tab is the page that matters.
+
 ## Watch Mode And ntfy
 
 Watch mode is opt-in and keeps retrying without writing application data:

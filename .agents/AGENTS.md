@@ -344,6 +344,8 @@ The verified milestone sequence was: after logout, the login page visibly displa
 
 The worker now has opt-in unattended watch mode: `npm run start --workspace=archershub-worker -- --watch --interval-seconds 900`. Set `NTFY_TOPIC` for ntfy alerts, with optional `NTFY_SERVER` and `NTFY_TOKEN`. It distinguishes `WAITING_FOR_REAUTHENTICATION` from `PROVIDER_UNAVAILABLE`, sends notifications only on state changes plus recovery, attempts Google account selection once per authentication incident, and then waits rather than repeatedly initiating OAuth while phone notifications are unreliable. Manual recovery is performed in the `desktop` user's XFCE/RDP Chrome session; after approval, the worker resumes when its authenticated probe succeeds. The worker must never automate Google passwords or MFA, and must never call `browser.close()` on the attached desktop-owned Chrome process.
 
+The OAuth callback may complete in a different CDP-attached tab while the original ArchersHub login tab remains open. Authentication completion must scan all attached pages for a real authenticated dashboard/Course Finder marker. Checking only the original page causes a false `AUTHENTICATION_REQUIRED` result even after the Google account was selected and MFA approved.
+
 ## Source Of Truth Priority
 
 When documentation conflicts, use this order:

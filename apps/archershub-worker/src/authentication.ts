@@ -35,12 +35,13 @@ export async function completeGoogleSignIn(
   let accountSelected = false;
 
   while (Date.now() < deadline) {
+    const authenticatedPage = await findAuthenticatedPage(context);
+    if (authenticatedPage) return authenticatedPage;
+
     const googlePage = context.pages().find((candidate) =>
       candidate.url().startsWith("https://accounts.google.com/")
     );
     if (googlePage) page = googlePage;
-
-    if (await isAuthenticatedPage(page)) return page;
 
     if (googlePage && !accountSelected) {
       await page.waitForLoadState("domcontentloaded").catch(() => undefined);
@@ -68,7 +69,8 @@ export async function completeGoogleSignIn(
       await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(
         () => undefined
       );
-      if (await isAuthenticatedPage(page)) return page;
+      const settledPage = await findAuthenticatedPage(context);
+      if (settledPage) return settledPage;
     }
 
     await page.waitForTimeout(500);
@@ -77,4 +79,13 @@ export async function completeGoogleSignIn(
   throw new Error(
     "AUTHENTICATION_REQUIRED: Google sign-in did not return to an authenticated ArchersHub page; complete any password or phone approval in Chrome"
   );
+}
+
+async function findAuthenticatedPage(
+  context: BrowserContext
+): Promise<Page | undefined> {
+  for (const candidate of context.pages().reverse()) {
+    if (await isAuthenticatedPage(candidate)) return candidate;
+  }
+  return undefined;
 }
