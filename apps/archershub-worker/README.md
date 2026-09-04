@@ -37,7 +37,7 @@ npm run start -- \
   --cdp http://127.0.0.1:9222 \
   --course STSWENG \
   --login \
-  --google-account jose_edgardo_valle@dlsu.edu.ph
+  --google-account example@dlsu.edu.ph
 ```
 
 The worker clicks ArchersHub's real `Continue with Google` element and selects the matching account in Google's chooser. It does not enter a password or approve phone MFA. If either is requested, complete it manually in Chrome. The worker waits for the authenticated ArchersHub dashboard before fetching Course Finder data.
@@ -58,7 +58,7 @@ npm run start -- \
   --watch \
   --interval-seconds 900 \
   --cdp http://127.0.0.1:9222 \
-  --course LASARE1 \
+  --course STSWENG \
   --login \
   --google-account example@dlsu.edu.ph
 ```
@@ -72,6 +72,8 @@ The worker sends one notification when it enters a new state:
 - Recovery: Course Finder is authenticated again.
 
 The worker attempts Google account selection only once per authentication incident. After that it pauses login attempts while polling, so inconsistent Google phone notifications do not cause repeated OAuth requests. `--watch` without `--login` is valid and will alert on expiry while waiting for manual recovery; rerun with `--login` when account selection must be automated.
+
+In watch mode the worker also keeps the ArchersHub portal session alive every five minutes. It runs the portal's own read-only `POST /StudentLogin/ReFillSession/` endpoint inside the authenticated page context and updates the portal's existing `localStorage["IdleTime"]` marker. This is intended to prevent the portal's 10-minute inactivity warning and 2-minute logout while the worker is actively maintaining the session. It does not simulate mouse/keyboard input, touch the Google session, enter credentials, approve MFA, or navigate to the URL returned by the endpoint. If the keepalive returns login HTML, a redirect, or an error, normal ntfy state handling takes over.
 
 Expected output is similar to:
 
@@ -101,7 +103,7 @@ npm run start -- \
   --cdp http://127.0.0.1:9222 \
   --course STSWENG \
   --login \
-  --google-account jose_edgardo_valle@dlsu.edu.ph
+  --google-account example@dlsu.edu.ph
 ```
 
 Each run creates one `archershub-*.jsonl` file. Events include worker startup, CDP page counts, Google-page discovery, account selection, MFA prompt kind and number, authentication completion, endpoint status/timing/response size, state transitions, and errors. URLs are logged without query strings. Request forms and response bodies are never logged. The directory is created with mode `700` and files with mode `600` where supported.

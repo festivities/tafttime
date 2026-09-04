@@ -6,7 +6,7 @@ import {
   isAuthenticatedPage,
   type MfaPrompt,
 } from "./authentication";
-import { fetchCourseFinder } from "./course-finder";
+import { fetchCourseFinder, keepArchersHubSessionAlive } from "./course-finder";
 import { createNtfyNotifier, notifySafely, type Notifier } from "./notifier";
 import { errorCategory, type WorkerState } from "./state";
 import { createDiagnosticLogger, type DiagnosticLogger } from "./logger";
@@ -50,7 +50,7 @@ async function runOnce(
   account: string,
   notify: Notifier,
   logger: DiagnosticLogger
-): Promise<{ courses: number; classes: number }> {
+): Promise<{ courses: number; classes: number; page: Page }> {
   const { context } = await connectPage(cdp);
   let page = context.pages()[0] ?? (await context.newPage());
   {
@@ -87,7 +87,7 @@ async function runOnce(
     );
     console.log(`Selectable classes: ${result.classes.length}`);
     console.log(`Sections: ${sections.join(", ") || "none"}`);
-    return { courses: result.courses.length, classes: result.classes.length };
+    return { courses: result.courses.length, classes: result.classes.length, page };
   }
 }
 
@@ -122,6 +122,32 @@ async function runWatch(
 ): Promise<never> {
   let state: WorkerState | undefined;
   let loginAttemptedForIncident = false;
+  let activePage: Page | undefined;
+  let keepAliveInFlight = false;
+
+  setInterval(() => {
+    if (!activePage || keepAliveInFlight) return;
+    keepAliveInFlight = true;
+    keepArchersHubSessionAlive(activePage, logger)
+      .catch(async (error: unknown) => {
+        const nextState = errorCategory(error);
+        logger.error("session.keepalive_failed", { state: nextState });
+        if (nextState !== state) {
+          state = nextState;
+          loginAttemptedForIncident = nextState === "WAITING_FOR_REAUTHENTICATION";
+          await notifySafely(
+            notify,
+            `TaftTime: ${nextState}`,
+            nextState === "WAITING_FOR_REAUTHENTICATION"
+              ? "ArchersHub logged out during inactivity. Connect through RDP and complete Continue with Google; the worker will resume automatically."
+              : "ArchersHub session keepalive failed. The worker will retry automatically."
+          );
+        }
+      })
+      .finally(() => {
+        keepAliveInFlight = false;
+      });
+  }, 5 * 60 * 1000);
 
   for (;;) {
     try {
@@ -133,6 +159,7 @@ async function runWatch(
         notify,
         logger
       );
+      activePage = result.page;
       if (state !== "AUTHENTICATED") {
         await notifySafely(
           notify,

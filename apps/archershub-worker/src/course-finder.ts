@@ -11,6 +11,43 @@ import type {
 
 export const COURSE_FINDER_PATH = "/CourseFinder/Index";
 
+export async function keepArchersHubSessionAlive(
+  page: Page,
+  logger?: DiagnosticLogger
+): Promise<void> {
+  const started = Date.now();
+  const response = await page.evaluate(async () => {
+    localStorage.setItem("IdleTime", new Date().toString());
+    const result = await fetch("/StudentLogin/ReFillSession/", {
+      method: "POST",
+      credentials: "same-origin",
+    });
+    return {
+      status: result.status,
+      url: result.url,
+      contentType: result.headers.get("content-type") ?? "",
+      bodyBytes: (await result.text()).length,
+    };
+  });
+
+  logger?.info("session.keepalive", {
+    status: response.status,
+    url: response.url,
+    contentType: response.contentType,
+    bodyBytes: response.bodyBytes,
+    durationMs: Date.now() - started,
+  });
+
+  if (
+    isLoginUrl(response.url) ||
+    /text\/html/i.test(response.contentType) ||
+    response.status < 200 ||
+    response.status >= 300
+  ) {
+    throw new Error("AUTHENTICATION_REQUIRED: session keepalive failed");
+  }
+}
+
 export async function postForm<T>(
   page: Page,
   path: string,
