@@ -150,10 +150,22 @@ export async function fetchCourseFinder(
   coursePrefix: string,
   logger?: DiagnosticLogger
 ): Promise<CourseFinderResult> {
+  const campus = page.locator("#ddlSelectCampus");
+  const academicSession = page.locator("#ddlSelectAcadSession");
+  const currentUrl = new URL(page.url());
+  let authenticated =
+    currentUrl.origin === ARCHERSHUB_ORIGIN &&
+    /^\/coursefinder\/index(?:\/|$)/i.test(currentUrl.pathname) &&
+    (await campus.count()) > 0 &&
+    (await academicSession.count()) > 0;
+
+  if (authenticated) {
+    logger?.info("course_finder.authenticated", { source: "existing_page" });
+  }
+
   // OAuth can render the dashboard before the server-side session is ready.
   // Retry navigation without starting another OAuth flow.
-  let authenticated = false;
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; !authenticated && attempt <= 3; attempt++) {
     await page.goto(`${ARCHERSHUB_ORIGIN}${COURSE_FINDER_PATH}`, {
       waitUntil: "domcontentloaded",
     });
@@ -162,15 +174,18 @@ export async function fetchCourseFinder(
     );
     if (isLoginUrl(page.url())) break;
     try {
-      await page.locator("#ddlSelectCampus").waitFor({
+      await campus.waitFor({
         state: "attached",
         timeout: 5_000,
       });
-      await page.locator("#ddlSelectAcadSession").waitFor({
+      await academicSession.waitFor({
         state: "attached",
         timeout: 5_000,
       });
-      logger?.info("course_finder.authenticated", { attempt });
+      logger?.info("course_finder.authenticated", {
+        source: "navigation",
+        attempt,
+      });
       authenticated = true;
       break;
     } catch {
@@ -183,8 +198,8 @@ export async function fetchCourseFinder(
     throw new Error("AUTHENTICATION_REQUIRED: ArchersHub login is required");
   }
 
-  await page.locator("#ddlSelectCampus").waitFor({ state: "attached" });
-  await page.locator("#ddlSelectAcadSession").waitFor({ state: "attached" });
+  await campus.waitFor({ state: "attached" });
+  await academicSession.waitFor({ state: "attached" });
 
   const selection = await page.evaluate(() => ({
     campus: (document.querySelector("#ddlSelectCampus") as HTMLSelectElement)
