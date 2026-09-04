@@ -81,14 +81,24 @@ export async function fetchCourseFinder(
   page: Page,
   coursePrefix: string
 ): Promise<CourseFinderResult> {
-  await page.goto(`${ARCHERSHUB_ORIGIN}${COURSE_FINDER_PATH}`, {
-    waitUntil: "domcontentloaded",
-  });
-  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(
-    () => undefined
-  );
+  // OAuth can render the dashboard before the server-side session is ready.
+  // Retry navigation without starting another OAuth flow.
+  let authenticated = false;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await page.goto(`${ARCHERSHUB_ORIGIN}${COURSE_FINDER_PATH}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(
+      () => undefined
+    );
+    if (await isAuthenticatedPage(page)) {
+      authenticated = true;
+      break;
+    }
+    if (attempt < 3) await page.waitForTimeout(2_000);
+  }
 
-  if (!(await isAuthenticatedPage(page))) {
+  if (!authenticated) {
     throw new Error("AUTHENTICATION_REQUIRED: ArchersHub login is required");
   }
 

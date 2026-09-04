@@ -47,7 +47,8 @@ async function runOnce(
   login: boolean,
   account: string
 ): Promise<{ courses: number; classes: number }> {
-  const { context, page } = await connectPage(cdp);
+  const { context } = await connectPage(cdp);
+  let page = context.pages()[0] ?? (await context.newPage());
   {
     await page.goto(`${ARCHERSHUB_ORIGIN}/CourseFinder/Index`, {
       waitUntil: "domcontentloaded",
@@ -64,7 +65,7 @@ async function runOnce(
       console.log("Clicking Continue with Google.");
       console.log("Complete any password or phone approval in Chrome if prompted.");
       await googleButton.click();
-      await completeGoogleSignIn(context, page, account);
+      page = await completeGoogleSignIn(context, page, account);
     }
 
     const result = await fetchCourseFinder(page, coursePrefix);

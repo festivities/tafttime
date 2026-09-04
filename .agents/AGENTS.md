@@ -346,6 +346,8 @@ The worker now has opt-in unattended watch mode: `npm run start --workspace=arch
 
 The OAuth callback may complete in a different CDP-attached tab while the original ArchersHub login tab remains open. Authentication completion must scan all attached pages for a real authenticated dashboard/Course Finder marker. Checking only the original page causes a false `AUTHENTICATION_REQUIRED` result even after the Google account was selected and MFA approved.
 
+The authenticated callback `Page` returned by `completeGoogleSignIn` must be assigned to the worker's active page variable. Reusing the original ArchersHub login-tab reference after callback completion makes the worker navigate the login tab to Course Finder and appear to undo a successful Google sign-in. Course Finder navigation retries briefly for server-side session establishment without restarting OAuth.
+
 ## Source Of Truth Priority
 
 When documentation conflicts, use this order:

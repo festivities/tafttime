@@ -44,6 +44,8 @@ The worker clicks ArchersHub's real `Continue with Google` element and selects t
 
 The Google chooser/callback may use a different tab from the original ArchersHub login tab. The worker therefore scans all pages attached to the CDP browser for an authenticated ArchersHub dashboard/Course Finder marker after account selection. Seeing the original ArchersHub login tab remain open during OAuth is normal; the callback tab is the page that matters.
 
+The authenticated callback page must be assigned back to the worker's active page reference. If the original login page is reused after the callback, the next Course Finder navigation sends that tab back to login and makes a successful Google sign-in appear to fail. The worker now preserves the callback page and retries Course Finder navigation briefly while the server-side session settles.
+
 ## Watch Mode And ntfy
 
 Watch mode is opt-in and keeps retrying without writing application data:
