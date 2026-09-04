@@ -57,6 +57,9 @@ async function runOnce(
     await page.goto(`${ARCHERSHUB_ORIGIN}/CourseFinder/Index`, {
       waitUntil: "domcontentloaded",
     });
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(
+      () => undefined
+    );
 
     if (!(await isAuthenticatedPage(page))) {
       if (!login) {

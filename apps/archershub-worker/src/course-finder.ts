@@ -30,6 +30,15 @@ export async function keepArchersHubSessionAlive(
 ): Promise<void> {
   const started = Date.now();
   const response = await page.evaluate(async () => {
+    // ArchersHub's inactivity plugin resets its timer from browser input
+    // events; changing IdleTime alone does not clear that timer.
+    document.dispatchEvent(
+      new MouseEvent("mousemove", {
+        bubbles: true,
+        clientX: 1,
+        clientY: 1,
+      })
+    );
     localStorage.setItem("IdleTime", new Date().toString());
     const result = await fetch("/StudentLogin/ReFillSession/", {
       method: "POST",
