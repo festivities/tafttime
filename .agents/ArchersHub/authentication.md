@@ -157,4 +157,6 @@ The worker now performs a conservative four-minute keepalive in watch mode. It s
 
 The keepalive dispatches a non-visible `mousemove` DOM event because the portal's inactivity plugin resets an internal timeout from input events; changing `localStorage["IdleTime"]` by itself does not reset that timeout. It does not move the OS cursor or interact with Google.
 
+Watch mode keeps one CDP connection, browser context, and active page across polling cycles. It no longer reconnects to Chrome or selects an arbitrary first page on each cycle. A fresh CDP connection is attempted only after a provider/CDP failure.
+
 The successful `ReFillSession` response is authenticated `StudentDashboard` HTML with HTTP 200, not JSON. Accept that destination even though it is HTML; reject login HTML, unexpected HTML destinations, and non-2xx responses. The captured log `archershub-2026-09-04T18-25-36-148Z.jsonl` showed the old implementation misclassifying two valid dashboard responses as authentication failures. The response classifier and regression tests now cover this case.

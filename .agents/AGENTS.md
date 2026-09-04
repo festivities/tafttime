@@ -356,6 +356,8 @@ The successful `ReFillSession` response is HTTP 200 HTML for `/StudentDashboard`
 
 The worker waits for Course Finder `networkidle` before classifying a page as unauthenticated; checking immediately after `domcontentloaded` can falsely start the Google flow on every watch cycle while authenticated navigation is still rendering. Its four-minute keepalive sends a tiny Playwright mouse move inside the page because ArchersHub's inactivity plugin resets an internal timer from input events; updating `localStorage["IdleTime"]` alone does not reset that timer. This does not move the physical OS cursor or interact with Google.
 
+Watch mode keeps one CDP connection, browser context, and active page across polling cycles. It does not reconnect to Chrome or select `context.pages()[0]` each cycle, which had made manual refresh behavior differ from worker behavior. A fresh CDP connection is attempted only after a provider/CDP failure.
+
 The OAuth callback may complete in a different CDP-attached tab while the original ArchersHub login tab remains open. Authentication completion must scan all attached pages for a real authenticated dashboard/Course Finder marker. Checking only the original page causes a false `AUTHENTICATION_REQUIRED` result even after the Google account was selected and MFA approved.
 
 The authenticated callback `Page` returned by `completeGoogleSignIn` must be assigned to the worker's active page variable. Reusing the original ArchersHub login-tab reference after callback completion makes the worker navigate the login tab to Course Finder and appear to undo a successful Google sign-in. Course Finder navigation retries briefly for server-side session establishment without restarting OAuth.

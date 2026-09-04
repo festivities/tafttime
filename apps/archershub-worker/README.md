@@ -95,6 +95,8 @@ Probe completed without modifying the attached browser.
 
 Counts and sections are live data and can change.
 
+Watch mode keeps one CDP connection, browser context, and active page across polling cycles. It does not reconnect to Chrome or select `context.pages()[0]` on every poll. If a provider/CDP error occurs, it attempts a fresh CDP connection and continues with the recovered page.
+
 ## Diagnostic Logging
 
 Enable secret-safe JSONL logs with `--log-dir` or `ARCHERSHUB_LOG_DIR`:

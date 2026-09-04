@@ -43,15 +43,15 @@ async function connectPage(cdp: string): Promise<{
 }
 
 async function runOnce(
-  cdp: string,
+  context: BrowserContext,
+  initialPage: Page,
   coursePrefix: string,
   login: boolean,
   account: string,
   notify: Notifier,
   logger: DiagnosticLogger
 ): Promise<{ courses: number; classes: number; page: Page }> {
-  const { context } = await connectPage(cdp);
-  let page = context.pages()[0] ?? (await context.newPage());
+  let page = initialPage;
   try {
     const result = await fetchCourseFinder(page, coursePrefix, logger);
     return logResult(result, page);
@@ -127,6 +127,7 @@ async function runWatch(
   let loginAttemptedForIncident = false;
   let activePage: Page | undefined;
   let keepAliveInFlight = false;
+  let connection = await connectPage(cdp);
 
   setInterval(() => {
     if (!activePage || keepAliveInFlight) return;
@@ -155,7 +156,8 @@ async function runWatch(
   for (;;) {
     try {
       const result = await runOnce(
-        cdp,
+        connection.context,
+        activePage ?? connection.page,
         coursePrefix,
         login && !loginAttemptedForIncident,
         account,
@@ -193,6 +195,17 @@ async function runWatch(
       state = nextState;
       if (nextState === "WAITING_FOR_REAUTHENTICATION") {
         loginAttemptedForIncident = true;
+      }
+      if (nextState === "PROVIDER_UNAVAILABLE") {
+        try {
+          connection = await connectPage(cdp);
+          activePage = connection.page;
+          logger.info("worker.cdp_reconnected");
+        } catch (reconnectError) {
+          logger.warn("worker.cdp_reconnect_failed", {
+            message: safeError(reconnectError),
+          });
+        }
       }
     }
 
@@ -240,7 +253,16 @@ async function main(): Promise<void> {
     return;
   }
 
-  await runOnce(cdp, coursePrefix, login, account, notify, logger);
+  const connection = await connectPage(cdp);
+  await runOnce(
+    connection.context,
+    connection.page,
+    coursePrefix,
+    login,
+    account,
+    notify,
+    logger
+  );
   console.log("Probe completed without modifying the attached browser.");
 }
 
