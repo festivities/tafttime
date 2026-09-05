@@ -306,6 +306,8 @@ npm run archershub:import --workspace=datapuller -- \
 
 Acceptance is covered offline: identical imports produce no duplicates, different courses/scopes stay separate, invalid bundles are rejected before any database call, and a simulated persistence failure preserves the previous document.
 
+Live-verified on Oracle in September 2026 against the isolated `tafttime_dlsu_dev` database: the STSWENG snapshot imported with exit 0 (`archershub/7/155/367`, six sections), re-import kept `archershub_offerings` at one document, a tampered copy (`CREDITS=6`) exited 1 with `NORMALIZATION_ERROR` and left the good document intact, and all Berkeley-named collections held zero documents.
+
 ## Phase H: Catalog And API Integration
 
 Inspect apps/datapuller/src/lib/catalog-denormalize.ts and apps/backend/src/modules/{catalog,class,term}/. The catalog reads catalog_classes, not just courses. Existing joins, visibility flags, and primary-section requirements need the approved DLSU mapping.
