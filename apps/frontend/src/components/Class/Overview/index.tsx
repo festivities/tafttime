@@ -15,7 +15,7 @@ const formatApplicationDeadline = (value: string): string => {
   const date = new Date(value);
   if (!Number.isNaN(date.getTime())) {
     return date.toLocaleDateString("en-US", {
-      timeZone: "America/Los_Angeles",
+      timeZone: "Asia/Manila",
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -55,7 +55,7 @@ const formatExamDate = (dateStr?: string | null): string | null => {
   }
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString("en-US", {
-    timeZone: "America/Los_Angeles",
+    timeZone: "Asia/Manila",
     weekday: "long",
     month: "short",
     day: "numeric",

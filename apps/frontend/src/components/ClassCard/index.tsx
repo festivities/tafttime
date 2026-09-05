@@ -33,10 +33,19 @@ const formatSemester = (semester: Semester): string => {
       return "Spring";
     case Semester.Summer:
       return "Summer";
+    case Semester.Term1:
+      return "Term 1";
+    case Semester.Term2:
+      return "Term 2";
+    case Semester.Term3:
+      return "Term 3";
     default:
       return semester;
   }
 };
+
+const formatCourseCode = (subject: string, courseNumber: string): string =>
+  subject === courseNumber ? subject : `${subject} ${courseNumber}`;
 
 const formatClassNumber = (number: string | undefined | null): string => {
   if (!number) return "";
@@ -181,7 +190,10 @@ export default function ClassCard({
                         {headingPrefix}
                       </span>
                       <span>
-                        {_class?.subject} {_class?.courseNumber}
+                        {formatCourseCode(
+                          _class?.subject ?? "",
+                          _class?.courseNumber ?? ""
+                        )}
                         {formattedClassNumber && (
                           <>
                             {" "}
@@ -194,7 +206,10 @@ export default function ClassCard({
                     </span>
                   ) : (
                     <>
-                      {_class?.subject} {_class?.courseNumber}
+                      {formatCourseCode(
+                        _class?.subject ?? "",
+                        _class?.courseNumber ?? ""
+                      )}
                       {formattedClassNumber && (
                         <>
                           {" "}

@@ -5,6 +5,12 @@
     ".": "./src/index.ts",
     "./models": "./src/models/index.ts",
     "./models/archershub-offering": "./src/models/archershub-offering.ts",
+    "./models/catalog-class": "./src/models/catalog-class.ts",
+    "./models/class": "./src/models/class.ts",
+    "./models/course": "./src/models/course.ts",
+    "./models/enrollment-history": "./src/models/enrollment-history.ts",
+    "./models/section": "./src/models/section.ts",
+    "./models/term": "./src/models/term.ts",
     "./lib/departmentNicknames": "./src/lib/departmentNicknames.ts"
   },
   "devDependencies": {

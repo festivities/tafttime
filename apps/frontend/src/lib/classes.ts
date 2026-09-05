@@ -1,4 +1,11 @@
-const SEMESTER_ORDER = ["Spring", "Summer", "Fall"];
+const SEMESTER_ORDER = [
+  "Spring",
+  "Summer",
+  "Fall",
+  "Term1",
+  "Term2",
+  "Term3",
+];
 
 const SEMESTER_INDEX = new Map(
   SEMESTER_ORDER.map((semester, index) => [semester, index])

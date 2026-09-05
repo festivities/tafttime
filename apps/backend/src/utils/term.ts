@@ -1,4 +1,4 @@
-import { TermInput } from "../generated-types/graphql";
+import { Semester, TermInput } from "../generated-types/graphql";
 
 export function termToString(term: TermInput): string {
   return `${term.year} ${term.semester}`;
@@ -17,7 +17,8 @@ export function stringToTerm(term: string): TermInput {
  * Useful for finding the course that corresponds to a class.
  */
 export function getTermStartMonth(term: TermInput) {
-  const startDates = {
+  // DLSU trimester start months are unverified; only Berkeley terms map here.
+  const startDates: Partial<Record<Semester, string>> = {
     Fall: `${term.year}-08-31`,
     Spring: `${term.year}-01-31`,
     Summer: `${term.year}-05-31`,

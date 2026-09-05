@@ -6,6 +6,9 @@ export const termTypeDef = gql`
     Fall
     Spring
     Winter
+    Term1
+    Term2
+    Term3
   }
 
   enum TemporalPosition {
@@ -69,6 +72,8 @@ export const termTypeDef = gql`
     endDate: String!
     sessions: [Session!]
     hasCatalogData: Boolean!
+    "Latest successful provider refresh for this term, if ingested from ArchersHub."
+    retrievedAt: String
   }
 
   type Query {

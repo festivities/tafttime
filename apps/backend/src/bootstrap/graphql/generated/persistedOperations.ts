@@ -344,6 +344,12 @@ export const persistedOperations: Readonly<Record<string, PersistedOperation>> =
     variableNames: [],
     sources: ["apps/staff-frontend/src/lib/api/staff.ts"],
   },
+  "4af8b36308fc370a0e6e829a8ee320557d4e4fbefe88cfb5ceaef915357fca74": {
+    operationName: "GetTerms",
+    document: "query GetTerms{terms(withCatalogData:true){year semester temporalPosition hasCatalogData retrievedAt sessions{id name startDate endDate temporalPosition __typename}startDate endDate __typename}}",
+    variableNames: [],
+    sources: ["apps/frontend/src/lib/api/terms.ts"],
+  },
   "4d066f6881899eb8bb65717335b1687864bb8e2d65f2debf04a6227f08415f7b": {
     operationName: "GetAllClassesForCourse",
     document: "query GetAllClassesForCourse($subject:String!$number:CourseNumber!){course(subject:$subject number:$number){classes{semester year number anyPrintInScheduleOfClasses primarySection{startDate meetings{instructors{familyName givenName __typename}__typename}__typename}__typename}__typename}}",
@@ -757,12 +763,6 @@ export const persistedOperations: Readonly<Record<string, PersistedOperation>> =
     document: "query CollectionAnalyticsData{collectionAnalyticsData{collectionCreations{createdAt userId __typename}classAdditions{addedAt userId __typename}customCollectionCreations{createdAt userId __typename}usersWithCustomCollections{createdAt userId __typename}customCollections{userEmail classCount name createdAt __typename}highlights{largestCollectionSize largestCustomCollectionSize largestCustomCollectionName mostBookmarkedCourse mostBookmarkedCourseCount mostCollectionsByUser __typename}__typename}}",
     variableNames: [],
     sources: ["apps/staff-frontend/src/lib/api/analytics.ts"],
-  },
-  "e97249c70d8a47a59a96728627078b5bc951c52d566afa0a10f953af5adc3332": {
-    operationName: "GetTerms",
-    document: "query GetTerms{terms(withCatalogData:true){year semester temporalPosition hasCatalogData sessions{id name startDate endDate temporalPosition __typename}startDate endDate __typename}}",
-    variableNames: [],
-    sources: ["apps/frontend/src/lib/api/terms.ts"],
   },
   "ebde8b5a1d81ff2e7cb8a8ce90b25c1b922c6108d031e5402ab4783cf016daed": {
     operationName: "CreateBanner",

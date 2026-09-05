@@ -124,6 +124,29 @@ The inspector rejects files larger than 10 MiB, malformed JSON, unsupported sche
 
 Watch mode keeps one CDP connection, browser context, and active page across polling cycles. It does not reconnect to Chrome or select `context.pages()[0]` on every poll. If a provider/CDP error occurs, it attempts a fresh CDP connection and continues with the recovered page.
 
+## Full-Catalog Crawl
+
+Crawl every listed course into per-course snapshots with `--all-courses`. Each course keeps the single-course schema, so the datapuller inspector, normalizer, and importer work unchanged:
+
+```sh
+install -d -m 700 /var/lib/tafttime/archershub/catalog
+npm run start -- \
+  --all-courses \
+  --snapshot-dir /var/lib/tafttime/archershub/catalog \
+  --delay-ms 2000
+```
+
+Behavior: one `GetCFData` per course with a polite delay between requests (default two seconds plus jitter, sequential on the same page); three attempts with exponential backoff on provider errors; empty class results are recorded as failures, never as valid empty snapshots; each course is published atomically to `<courseId>.json` with the previous file kept as `<courseId>.previous.json`. Progress is tracked in `manifest.json` (course status, attempts, retrieval times). Rerun with `--resume` to continue after an interruption; the manifest's campus/session must still match or the crawl aborts loudly. `AUTHENTICATION_REQUIRED` aborts the crawl after saving progress: reauthenticate in Chrome (or run a `--login` probe), then resume. The page reloads between requests roughly every 15 minutes to shift the server-context deadline, never during an in-flight request. `--course-limit <n>` crawls only the first `n` pending courses for testing. A nonzero exit with `CRAWL_INCOMPLETE` means some courses failed; their snapshots (if any) were preserved.
+
+Import a crawled directory with one shared database connection:
+
+```sh
+npm run archershub:import --workspace=datapuller -- \
+  --input-dir /var/lib/tafttime/archershub/catalog
+```
+
+`manifest.json` and `*.previous.json` files are skipped. Per-file failures are reported at the end and the command exits nonzero if any snapshot failed.
+
 ## Diagnostic Logging
 
 Enable secret-safe JSONL logs with `--log-dir` or `ARCHERSHUB_LOG_DIR`:

@@ -21,7 +21,7 @@ const CAPACITY_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
   minute: "2-digit",
   hour12: true,
-  timeZone: "America/Los_Angeles",
+  timeZone: "Asia/Manila",
 });
 
 interface CapacityChangeTooltipResult {

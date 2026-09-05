@@ -551,7 +551,9 @@ export default function Class({
                 <Flex justify="between" align="start" mt="2">
                   <Flex direction="column" gap="2">
                     <h1 className={styles.heading}>
-                      {_class.subject} {_class.courseNumber}{" "}
+                      {_class.subject === _class.courseNumber
+                        ? _class.subject
+                        : `${_class.subject} ${_class.courseNumber}`}{" "}
                       <span className={styles.sectionNumber}>
                         #{formatClassNumber(_class.number)}
                       </span>

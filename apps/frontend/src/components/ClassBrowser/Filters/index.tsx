@@ -207,6 +207,11 @@ export default function Filters() {
 
   const currentTermLabel = `${semester} ${year}`;
 
+  const formatTermOption = (termSemester: string, termYear: number) => {
+    const match = /^Term([123])$/.exec(termSemester);
+    return `${match ? `Term ${match[1]}` : termSemester} ${termYear}`;
+  };
+
   const handleClearFilters = () => {
     updateLevels([]);
     updateBreadths([]);
@@ -261,7 +266,7 @@ export default function Filters() {
             }}
             options={availableTerms.map((term) => ({
               value: `${term.semester} ${term.year}`,
-              label: `${term.semester} ${term.year}`,
+              label: formatTermOption(term.semester, term.year),
             }))}
             searchPlaceholder="Search semesters..."
             emptyMessage="No semesters found."

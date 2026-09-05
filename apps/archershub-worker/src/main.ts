@@ -10,7 +10,21 @@ import {
   type MfaPrompt,
   completeGoogleSignIn,
 } from "./authentication";
-import { fetchCourseFinder, keepArchersHubSessionAlive } from "./course-finder";
+import {
+  fetchClassRows,
+  fetchCourseFinder,
+  fetchCourseList,
+  keepArchersHubSessionAlive,
+} from "./course-finder";
+import {
+  checkCrawlScope,
+  courseSnapshotPath,
+  createCrawlManifest,
+  loadCrawlManifest,
+  manifestPath,
+  runCrawlCourses,
+  saveCrawlManifest,
+} from "./crawl";
 import { type DiagnosticLogger, createDiagnosticLogger } from "./logger";
 import { type Notifier, createNtfyNotifier, notifySafely } from "./notifier";
 import {
@@ -20,6 +34,7 @@ import {
 import { type WorkerState, errorCategory } from "./state";
 
 const COURSE_FINDER_REFRESH_MS = 20 * 60 * 1000;
+const CRAWL_REFRESH_MS = 15 * 60 * 1000;
 
 function argument(name: string, fallback: string): string {
   const index = process.argv.indexOf(`--${name}`);
@@ -275,6 +290,101 @@ async function runWatch(
   }
 }
 
+async function runCrawl(
+  initialPage: Page,
+  dir: string,
+  delayMs: number,
+  limit: number,
+  resume: boolean,
+  logger: DiagnosticLogger
+): Promise<void> {
+  const page = initialPage;
+  const { campus, academicSession, courses } = await fetchCourseList(
+    page,
+    logger
+  );
+  console.log(`Course offerings: ${courses.length}`);
+
+  let manifest = resume ? await loadCrawlManifest(dir) : null;
+  if (manifest) {
+    checkCrawlScope(manifest, campus, academicSession);
+    console.log(
+      `Resuming crawl from ${manifestPath(dir)} (${manifest.courses.filter((c) => c.status === "ok").length} ok, ${manifest.courses.filter((c) => c.status === "failed").length} failed, ${manifest.courses.filter((c) => c.status === "pending").length} pending).`
+    );
+  } else {
+    try {
+      await loadCrawlManifest(dir);
+      throw new Error(
+        `MANIFEST_EXISTS: ${manifestPath(dir)} already exists; pass --resume to continue or use an empty directory`
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        !error.message.startsWith("MANIFEST_ERROR: could not read")
+      ) {
+        throw error;
+      }
+    }
+    manifest = createCrawlManifest(campus, academicSession, courses, delayMs);
+    await saveCrawlManifest(dir, manifest, logger);
+  }
+
+  // Reloading between requests shifts the ~30-minute server-context deadline;
+  // never reload during an in-flight page evaluation.
+  let lastRefresh = Date.now();
+  const { ok, failed } = await runCrawlCourses(
+    manifest,
+    dir,
+    {
+      fetchRows: async (course) => {
+        if (Date.now() - lastRefresh > CRAWL_REFRESH_MS) {
+          logger.info("crawl.refresh");
+          await page
+            .reload({ waitUntil: "domcontentloaded" })
+            .catch(() => undefined);
+          await page
+            .waitForLoadState("networkidle", { timeout: 15_000 })
+            .catch(() => undefined);
+          lastRefresh = Date.now();
+        }
+        return fetchClassRows(
+          page,
+          campus,
+          academicSession,
+          course.courseCreationId,
+          logger
+        );
+      },
+      publish: async (course, rows) => {
+        const matchedCourse = {
+          COURSE_CREATION_ID: course.courseCreationId,
+          COURSE_NAME: course.courseName,
+        };
+        const snapshot = createArchersHubSnapshot({
+          campus,
+          academicSession,
+          courses: [matchedCourse],
+          matchedCourse,
+          classes: rows,
+        });
+        await publishArchersHubSnapshot(
+          snapshot,
+          courseSnapshotPath(dir, course.courseCreationId),
+          logger
+        );
+        return snapshot.retrievedAt;
+      },
+      logger,
+    },
+    limit
+  );
+
+  console.log(JSON.stringify({ campus, academicSession, ok, failed }, null, 2));
+  if (failed > 0) {
+    throw new Error(`CRAWL_INCOMPLETE: ${failed} course(s) failed`);
+  }
+}
+
 async function main(): Promise<void> {
   const cdp = argument("cdp", "http://127.0.0.1:9222");
   const coursePrefix = argument("course", "STSWENG");
@@ -282,16 +392,25 @@ async function main(): Promise<void> {
   const login = hasFlag("login");
   const watch = hasFlag("watch");
   const snapshotPath = argument("snapshot-path", "") || undefined;
+  const crawlDir = argument("snapshot-dir", "") || undefined;
+  const crawlAll = hasFlag("all-courses");
+  const crawlResume = hasFlag("resume");
+  const crawlDelayMs = numberArgument("delay-ms", 2000);
+  const crawlLimit = Number(argument("course-limit", "0")) || 0;
   const logger = createDiagnosticLogger(
     argument("log-dir", process.env.ARCHERSHUB_LOG_DIR ?? "") || undefined
   );
   logger.info("worker.start", {
-    mode: watch ? "watch" : "once",
+    mode: watch ? "watch" : crawlAll ? "crawl" : "once",
     cdp,
     coursePrefix,
     intervalSeconds: numberArgument("interval-seconds", 300),
     refreshSeconds: COURSE_FINDER_REFRESH_MS / 1000,
     snapshotEnabled: Boolean(snapshotPath),
+    crawlDir,
+    crawlDelayMs,
+    crawlLimit,
+    crawlResume,
   });
 
   if (login && !account) {
@@ -319,7 +438,30 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (crawlAll && !crawlDir) {
+    throw new Error(
+      "SNAPSHOT_DIR_REQUIRED: pass --snapshot-dir <directory> with --all-courses"
+    );
+  }
+  if (crawlDir && !crawlAll) {
+    throw new Error(
+      "ALL_COURSES_REQUIRED: --snapshot-dir requires --all-courses"
+    );
+  }
+
   const connection = await connectPage(cdp);
+  if (crawlAll && crawlDir) {
+    await runCrawl(
+      connection.page,
+      crawlDir,
+      crawlDelayMs,
+      crawlLimit,
+      crawlResume,
+      logger
+    );
+    console.log("Crawl completed without modifying the attached browser.");
+    return;
+  }
   const result = await runOnce(
     connection.context,
     connection.page,

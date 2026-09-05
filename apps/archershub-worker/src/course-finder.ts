@@ -174,6 +174,34 @@ export async function fetchCourseFinder(
   logger?: DiagnosticLogger,
   refreshPage = false
 ): Promise<CourseFinderResult> {
+  const { campus, academicSession, courses } = await fetchCourseList(
+    page,
+    logger,
+    refreshPage
+  );
+  const matchedCourse = selectCourse(courses, coursePrefix);
+  const classes = await fetchClassRows(
+    page,
+    campus,
+    academicSession,
+    matchedCourse.COURSE_CREATION_ID,
+    logger
+  );
+
+  return {
+    campus,
+    academicSession,
+    courses,
+    matchedCourse,
+    classes,
+  };
+}
+
+export async function fetchCourseList(
+  page: Page,
+  logger?: DiagnosticLogger,
+  refreshPage = false
+): Promise<{ campus: string; academicSession: string; courses: Course[] }> {
   const campus = page.locator("#ddlSelectCampus");
   const academicSession = page.locator("#ddlSelectAcadSession");
   const currentUrl = new URL(page.url());
@@ -262,26 +290,30 @@ export async function fetchCourseFinder(
       logger
     )
   );
-  const matchedCourse = selectCourse(list, coursePrefix);
-
-  const classes = validateClassRows(
-    await postForm<ClassRow[]>(
-      page,
-      "/CourseFinder/GetCFData/",
-      {
-        Campusno: selection.campus,
-        AcademicSession: selection.academicSession,
-        Courseid: String(matchedCourse.COURSE_CREATION_ID),
-      },
-      logger
-    )
-  );
-
   return {
     campus: selection.campus,
     academicSession: selection.academicSession,
     courses: list,
-    matchedCourse,
-    classes,
   };
+}
+
+export async function fetchClassRows(
+  page: Page,
+  campus: string,
+  academicSession: string,
+  courseId: Course["COURSE_CREATION_ID"],
+  logger?: DiagnosticLogger
+): Promise<ClassRow[]> {
+  return validateClassRows(
+    await postForm<ClassRow[]>(
+      page,
+      "/CourseFinder/GetCFData/",
+      {
+        Campusno: campus,
+        AcademicSession: academicSession,
+        Courseid: String(courseId),
+      },
+      logger
+    )
+  );
 }

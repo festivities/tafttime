@@ -29,6 +29,7 @@ import {
   Semester,
 } from "@/lib/generated/graphql";
 import { RecentType, addRecent, getRecents } from "@/lib/recent";
+import { staleBannerText } from "@/lib/catalogStale";
 import { compareCollectionsByBookmarksOrder } from "@/utils/collections";
 
 import styles from "./Catalog.module.scss";
@@ -40,12 +41,15 @@ const SEMESTER_ORDER: Record<Semester, number> = {
   [Semester.Summer]: 1,
   [Semester.Fall]: 2,
   [Semester.Winter]: 3,
+  [Semester.Term1]: 0,
+  [Semester.Term2]: 1,
+  [Semester.Term3]: 2,
 };
 
 // Fallback term so the catalog UI always renders (query will return 0 results)
 const FALLBACK_TERM = {
   year: new Date().getFullYear(),
-  semester: Semester.Spring as Semester,
+  semester: Semester.Term1 as Semester,
 };
 
 type SavedClassItem = {
@@ -328,6 +332,11 @@ export default function Catalog() {
 
   const effectiveTerm = term ?? FALLBACK_TERM;
 
+  const staleMessage = useMemo(
+    () => staleBannerText(term?.retrievedAt),
+    [term]
+  );
+
   const { data: identitiesData } = useQuery(GetCatalogClassIdentitiesDocument, {
     variables: {
       year: effectiveTerm.year,
@@ -600,6 +609,9 @@ export default function Catalog() {
         )}
 
         <Flex direction="column" flexGrow="1" className={styles.view}>
+          {staleMessage && (
+            <div className={styles.staleBanner}>{staleMessage}</div>
+          )}
           {user && (
             <div className={styles.bookmarkBanner}>
               <div

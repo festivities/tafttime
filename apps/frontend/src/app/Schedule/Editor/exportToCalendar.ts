@@ -7,7 +7,7 @@ const generateICS = (schedule: ISchedule) => {
 
   const formatTime = (timeStr: string, date: Date) => {
     const [hours, minutes] = timeStr.split(":");
-    // Format as local time in Pacific timezone (no UTC conversion, no Z suffix)
+    // Format as local time in the Asia/Manila timezone (no UTC conversion, no Z suffix)
     // Since dates are already in Pacific time, we just format the components directly
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -61,21 +61,13 @@ const generateICS = (schedule: ISchedule) => {
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VTIMEZONE",
-    "TZID:America/Los_Angeles",
+    "TZID:Asia/Manila",
     "BEGIN:STANDARD",
-    "DTSTART:20071104T020000",
-    "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU",
-    "TZOFFSETFROM:-0700",
-    "TZOFFSETTO:-0800",
-    "TZNAME:PST",
+    "DTSTART:19700101T000000",
+    "TZOFFSETFROM:+0800",
+    "TZOFFSETTO:+0800",
+    "TZNAME:PHT",
     "END:STANDARD",
-    "BEGIN:DAYLIGHT",
-    "DTSTART:20070311T020000",
-    "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU",
-    "TZOFFSETFROM:-0800",
-    "TZOFFSETTO:-0700",
-    "TZNAME:PDT",
-    "END:DAYLIGHT",
     "END:VTIMEZONE",
   ];
 
@@ -145,8 +137,8 @@ const generateICS = (schedule: ISchedule) => {
         icsContent.push(
           "BEGIN:VEVENT",
           `UID:${eventId}@berkeleytime.com`,
-          `DTSTART;TZID=America/Los_Angeles:${formatTime(meeting.startTime, startDate)}`,
-          `DTEND;TZID=America/Los_Angeles:${formatTime(meeting.endTime, startDate)}`,
+          `DTSTART;TZID=Asia/Manila:${formatTime(meeting.startTime, startDate)}`,
+          `DTEND;TZID=Asia/Manila:${formatTime(meeting.endTime, startDate)}`,
           `RRULE:FREQ=WEEKLY;BYDAY=${activeDays.join(",")};UNTIL=${formatDate(endDate)}`,
           `SUMMARY:${summary}`,
           `DESCRIPTION:${description}${instructor ? `\nInstructor: ${instructor}` : ""}`,
@@ -178,8 +170,8 @@ const generateICS = (schedule: ISchedule) => {
     icsContent.push(
       "BEGIN:VEVENT",
       `UID:${event._id}@berkeleytime.com`,
-      `DTSTART;TZID=America/Los_Angeles:${formatTime(event.startTime, startDate)}`,
-      `DTEND;TZID=America/Los_Angeles:${formatTime(event.endTime, startDate)}`,
+      `DTSTART;TZID=Asia/Manila:${formatTime(event.startTime, startDate)}`,
+      `DTEND;TZID=Asia/Manila:${formatTime(event.endTime, startDate)}`,
       `RRULE:FREQ=WEEKLY;BYDAY=${activeDays.join(",")};UNTIL=${formatDate(endDate)}`,
       `SUMMARY:${event.title}`,
       `DESCRIPTION:${event.description || ""}`,

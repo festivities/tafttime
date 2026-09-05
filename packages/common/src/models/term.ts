@@ -56,6 +56,8 @@ export interface ITermItem {
   selfServiceEnrollEndDate?: string;
   sessions?: ISessionItem[];
   hasCatalogData: boolean;
+  // Latest successful provider refresh for ArchersHub-ingested terms.
+  retrievedAt?: string;
 }
 
 const termSchema = new Schema<ITermItem>({
@@ -121,6 +123,7 @@ const termSchema = new Schema<ITermItem>({
     ],
   },
   hasCatalogData: { type: Boolean, required: true, default: true },
+  retrievedAt: { type: String },
 });
 
 // for catalog, grade distribution by semester, scheduler, and terms controllers

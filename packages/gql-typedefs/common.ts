@@ -32,6 +32,9 @@ export const commonTypeDef = gql`
     Spring
     Summer
     Winter
+    Term1
+    Term2
+    Term3
   }
 
   type Query {

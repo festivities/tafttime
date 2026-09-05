@@ -401,6 +401,18 @@ The OAuth callback may complete in a different CDP-attached tab while the origin
 
 The authenticated callback `Page` returned by `completeGoogleSignIn` must be assigned to the worker's active page variable. Reusing the original ArchersHub login-tab reference after callback completion makes the worker navigate the login tab to Course Finder and appear to undo a successful Google sign-in. Course Finder navigation retries briefly for server-side session establishment without restarting OAuth.
 
+## DLSU Catalog Projection
+
+`apps/datapuller/src/lib/archershub-project.ts` projects each `archershub_offerings` document into the inherited `terms`/`courses`/`classes`/`sections`/`enrollmentHistories` shape so the existing catalog queries work unchanged, then the existing denormalizer materializes `catalog_classes`. Canonical catalog semester tokens are `Term1`, `Term2`, `Term3` (GraphQL `Semester` enum values; never translate trimesters to Fall/Spring/Summer). Term names are `"<startYear> Term<n>"`. IDs are scoped (`archershub-<campus>-<session>` terms, `archershub:<campus>:<session>:<course>` courses) and must be considered unstable across terms. Each selectable section becomes one class with a single primary section; no primary/secondary hierarchy is fabricated. The course code serves as both subject and course number. Enrollment status is `O` only for positive signed availability, `C` for zero/negative, and omitted when unknown. Lecture/Laboratory map to LEC/LAB; online modality maps to instruction mode `O`. Grading basis, final exam, descriptions, and unparsed meetings are omitted, not fabricated. `academicCareerCode`/`academicCareer` default to `UGRD` only to satisfy inherited required filters; academic career remains unconfirmed. Terms carry `retrievedAt` (latest successful refresh), exposed as `Term.retrievedAt`; the catalog shows `Course data may be outdated. Last updated <time>.` after 30 minutes without a refresh.
+
+```sh
+npm run archershub:project --workspace=datapuller -- --mongodb-uri <isolated-dev-uri>
+```
+
+The projector replaces only the affected scopes, rebuilds `catalog_classes` per term with plain delete plus batched insert (no transactions, so standalone MongoDB works), refuses to replace a term's catalog rows when zero classes build, and exits nonzero when any offering is skipped. Ratings and reviews resolve the projected class identity and aggregate by the scoped `courseId` with no code change; the DLSU dataset starts empty and Berkeley records are never attached. GradTrak routes and navigation are hidden for the initial deployment while `apps/frontend/src/app/GradTrak/` is retained. Schedule display, calendar export (DST-free Manila VTIMEZONE), and enrollment tooltips use `Asia/Manila`; conflict detection is timezone-free.
+
+Full-catalog crawling is `npm run start --workspace=archershub-worker -- --all-courses --snapshot-dir <dir>` with `--delay-ms`, `--course-limit`, and `--resume`. Each course keeps the single-course snapshot schema; empty class results are failures, never valid snapshots; progress lives in `manifest.json`; resume requires a matching campus/session; authentication loss aborts after saving progress. Import a crawled directory with `archershub:import -- --input-dir <dir>`, then project.
+
 ## Source Of Truth Priority
 
 When documentation conflicts, use this order:

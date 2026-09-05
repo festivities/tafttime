@@ -12,6 +12,7 @@ const fields = {
   beginDate: 1,
   endDate: 1,
   hasCatalogData: 1,
+  retrievedAt: 1,
   sessions: {
     temporalPosition: 1,
     id: 1,

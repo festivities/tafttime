@@ -61,7 +61,7 @@ const TOOLTIP_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
   minute: "2-digit",
   hour12: true,
-  timeZone: "America/Los_Angeles",
+  timeZone: "Asia/Manila",
 });
 
 const TOOLTIP_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
@@ -71,7 +71,7 @@ const TOOLTIP_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
   minute: "2-digit",
   hour12: true,
-  timeZone: "America/Los_Angeles",
+  timeZone: "Asia/Manila",
 });
 
 const getSeriesKey = (index: number) => `enroll_${index}`;

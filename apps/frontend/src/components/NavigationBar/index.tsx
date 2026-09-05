@@ -192,7 +192,6 @@ export default function NavigationBar({
               {[
                 { to: "/catalog", label: "Catalog" },
                 { to: "/schedules", label: "Scheduler" },
-                { to: "/gradtrak", label: "Gradtrak" },
                 { to: gradesPath, label: "Grades" },
                 { to: enrollmentPath, label: "Enrollment" },
               ].map(({ to, label }) => (
@@ -264,13 +263,6 @@ export default function NavigationBar({
             {({ isActive }) => (
               <MenuItem className={styles.item} active={isActive}>
                 Scheduler
-              </MenuItem>
-            )}
-          </NavLink>
-          <NavLink to="/gradtrak">
-            {({ isActive }) => (
-              <MenuItem className={styles.item} active={isActive}>
-                Gradtrak
               </MenuItem>
             )}
           </NavLink>

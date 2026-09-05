@@ -16,7 +16,7 @@ import { Semester } from "@/lib/generated/graphql";
 import CreateScheduleDialog from "./CreateScheduleDialog";
 import styles from "./Schedules.module.scss";
 
-const SEMESTER_ORDER = ["Spring", "Summer", "Fall"];
+const SEMESTER_ORDER = ["Spring", "Summer", "Fall", "Term1", "Term2", "Term3"];
 
 export default function Schedules() {
   const { user, loading: userLoading } = useUser();

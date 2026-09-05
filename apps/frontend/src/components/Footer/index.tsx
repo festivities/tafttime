@@ -111,9 +111,6 @@ export default function Footer() {
             <Link to="/scheduler" className={styles.link}>
               Scheduler
             </Link>
-            <Link to="/gradtrak" className={styles.link}>
-              Gradtrak
-            </Link>
             <Link to="/grades" className={styles.link}>
               Grades
             </Link>

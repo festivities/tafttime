@@ -51,9 +51,11 @@ const Compare = lazy(() => import("@/app/Schedule/Comparison"));
 const Manage = lazy(() => import("@/app/Schedule/Editor"));
 const Schedules = lazy(() => import("@/app/Schedules"));
 // const Map = lazy(() => import("@/app/Map"));
-const GradTrak = lazy(() => import("@/app/GradTrak"));
-const GradTrakOnboarding = lazy(() => import("@/app/GradTrak/Onboarding"));
-const GradTrakDashboard = lazy(() => import("@/app/GradTrak/Dashboard"));
+// GradTrak is hidden for the initial DLSU deployment (no verified prerequisite
+// source). Code is retained under @/app/GradTrak for later use.
+// const GradTrak = lazy(() => import("@/app/GradTrak"));
+// const GradTrakOnboarding = lazy(() => import("@/app/GradTrak/Onboarding"));
+// const GradTrakDashboard = lazy(() => import("@/app/GradTrak/Dashboard"));
 const NotFound = lazy(() => import("@/app/NotFound"));
 
 const router = createBrowserRouter([
@@ -120,40 +122,41 @@ const router = createBrowserRouter([
           // },
         ],
       },
-      {
-        path: "gradtrak",
-        element: <Layout footer={false} />,
-        children: [
-          {
-            index: true,
-            element: (
-              <SuspenseBoundary key="gradtrak-landing">
-                <GradTrak />
-              </SuspenseBoundary>
-            ),
-          },
-          {
-            path: "onboarding",
-            element: (
-              <SuspenseBoundary key="gradtrak-onboarding">
-                <GradTrakOnboarding />
-              </SuspenseBoundary>
-            ),
-          },
-          {
-            path: "dashboard",
-            element: (
-              <SuspenseBoundary key="gradtrak-dashboard">
-                <GradTrakDashboard />
-              </SuspenseBoundary>
-            ),
-          },
-          {
-            path: "*",
-            loader: () => redirect("/gradtrak"),
-          },
-        ],
-      },
+      // GradTrak route hidden for the initial DLSU deployment; see above.
+      // {
+      //   path: "gradtrak",
+      //   element: <Layout footer={false} />,
+      //   children: [
+      //     {
+      //       index: true,
+      //       element: (
+      //         <SuspenseBoundary key="gradtrak-landing">
+      //           <GradTrak />
+      //         </SuspenseBoundary>
+      //       ),
+      //     },
+      //     {
+      //       path: "onboarding",
+      //       element: (
+      //         <SuspenseBoundary key="gradtrak-onboarding">
+      //           <GradTrakOnboarding />
+      //         </SuspenseBoundary>
+      //       ),
+      //     },
+      //     {
+      //       path: "dashboard",
+      //       element: (
+      //         <SuspenseBoundary key="gradtrak-dashboard">
+      //           <GradTrakDashboard />
+      //         </SuspenseBoundary>
+      //       ),
+      //     },
+      //     {
+      //       path: "*",
+      //       loader: () => redirect("/gradtrak"),
+      //     },
+      //   ],
+      // },
       {
         element: <Layout />,
         children: [

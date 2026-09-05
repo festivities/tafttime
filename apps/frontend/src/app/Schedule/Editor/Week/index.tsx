@@ -256,16 +256,15 @@ export default function Week({
   );
 
   const timeZoneLabel = useMemo(() => {
-    // Check if we're currently in Pacific Daylight Time (PDT) or Pacific Standard Time (PST)
-    const now = new Date();
+    // Asia/Manila (UTC+8) has no daylight saving; Intl renders "GMT+8".
     const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Los_Angeles",
+      timeZone: "Asia/Manila",
       timeZoneName: "short",
     });
-    const parts = formatter.formatToParts(now);
-    const tzName = parts.find((part) => part.type === "timeZoneName")?.value;
-    // Return PDT or PST based on the timezone name, default to PST if not found
-    return tzName === "PDT" ? "PDT" : "PST";
+    const parts = formatter.formatToParts(new Date());
+    return (
+      parts.find((part) => part.type === "timeZoneName")?.value ?? "GMT+8"
+    );
   }, []);
 
   const currentTime = useMemo(() => {

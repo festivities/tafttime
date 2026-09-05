@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import { resolve } from "node:path";
+import { readdir } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
@@ -71,22 +72,78 @@ export async function importArchersHubBundle(
   return summarizeArchersHubImport(bundle);
 }
 
+export async function importArchersHubDirectory(
+  dir: string,
+  store: OfferingStore = defaultStore
+): Promise<{ ok: string[]; failed: { file: string; error: string }[] }> {
+  const files = (await readdir(dir))
+    .filter(
+      (name) =>
+        name.endsWith(".json") &&
+        !name.endsWith(".previous.json") &&
+        name !== "manifest.json"
+    )
+    .sort();
+  const ok: string[] = [];
+  const failed: { file: string; error: string }[] = [];
+  for (const file of files) {
+    try {
+      const snapshot = await readArchersHubSnapshot(join(dir, file));
+      await importArchersHubBundle(
+        normalizeArchersHubSnapshot(snapshot),
+        store
+      );
+      ok.push(file);
+    } catch (error) {
+      failed.push({
+        file,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+  return { ok, failed };
+}
+
 async function main(): Promise<void> {
   dotenv.config();
   const { values } = parseArgs({
     options: {
       input: { type: "string" },
+      "input-dir": { type: "string" },
       "mongodb-uri": { type: "string" },
     },
   });
-  if (!values.input) throw new Error("Pass --input <snapshot-path>");
+  if (!values.input && !values["input-dir"]) {
+    throw new Error("Pass --input <snapshot-path> or --input-dir <directory>");
+  }
+  if (values.input && values["input-dir"]) {
+    throw new Error("Pass only one of --input or --input-dir");
+  }
   const uri = values["mongodb-uri"] ?? process.env.MONGODB_URI;
   if (!uri) throw new Error("Pass --mongodb-uri <uri> or set MONGODB_URI");
 
-  const snapshot = await readArchersHubSnapshot(values.input);
-  const bundle = normalizeArchersHubSnapshot(snapshot);
   await mongoose.connect(uri);
   try {
+    if (values["input-dir"]) {
+      const result = await importArchersHubDirectory(values["input-dir"]);
+      console.log(
+        JSON.stringify(
+          {
+            imported: result.ok.length,
+            files: result.ok,
+            failed: result.failed,
+          },
+          null,
+          2
+        )
+      );
+      if (result.failed.length > 0) {
+        throw new Error(`${result.failed.length} snapshot(s) failed to import`);
+      }
+      return;
+    }
+    const snapshot = await readArchersHubSnapshot(values.input as string);
+    const bundle = normalizeArchersHubSnapshot(snapshot);
     const summary = await importArchersHubBundle(bundle);
     console.log(JSON.stringify(summary, null, 2));
   } finally {

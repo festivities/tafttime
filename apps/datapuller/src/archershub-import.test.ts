@@ -1,11 +1,15 @@
 import { createArchersHubSnapshot } from "archershub-worker/snapshot";
 import mongoose from "mongoose";
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
   getArchersHubOfferingFilter,
   importArchersHubBundle,
+  importArchersHubDirectory,
   summarizeArchersHubImport,
   toArchersHubOfferingDocument,
 } from "./archershub-import";
@@ -38,7 +42,7 @@ function row(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function bundleFor(
+function snapshotFor(
   courseId: number,
   courseName: string,
   retrievedAt = RETRIEVED_AT
@@ -47,7 +51,7 @@ function bundleFor(
     COURSE_CREATION_ID: courseId,
     COURSE_NAME: courseName,
   };
-  const snapshot = createArchersHubSnapshot(
+  return createArchersHubSnapshot(
     {
       campus: "7",
       academicSession: "155",
@@ -59,7 +63,16 @@ function bundleFor(
     },
     retrievedAt
   );
-  return normalizeArchersHubSnapshot(snapshot);
+}
+
+function bundleFor(
+  courseId: number,
+  courseName: string,
+  retrievedAt = RETRIEVED_AT
+) {
+  return normalizeArchersHubSnapshot(
+    snapshotFor(courseId, courseName, retrievedAt)
+  );
 }
 
 function fakeStore() {
@@ -170,4 +183,29 @@ test("reports only safe import metadata", () => {
   assert.equal(summary.sectionCount, 1);
   assert.equal(summary.scope.courseCreationId, "367");
   assert.doesNotMatch(JSON.stringify(summary), /Teacher One/);
+});
+
+test("imports a snapshot directory and skips non-course files", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "archershub-import-"));
+  writeFileSync(
+    join(dir, "367.json"),
+    JSON.stringify(snapshotFor(367, STSWENG))
+  );
+  writeFileSync(
+    join(dir, "999.json"),
+    JSON.stringify(snapshotFor(999, "CCPROG1 - TEST COURSE"))
+  );
+  writeFileSync(join(dir, "bad.json"), "{not json");
+  writeFileSync(join(dir, "manifest.json"), "{}");
+  writeFileSync(
+    join(dir, "367.previous.json"),
+    JSON.stringify(snapshotFor(367, STSWENG))
+  );
+
+  const store = fakeStore();
+  const result = await importArchersHubDirectory(dir, store);
+  assert.deepEqual(result.ok, ["367.json", "999.json"]);
+  assert.equal(result.failed.length, 1);
+  assert.equal(result.failed[0].file, "bad.json");
+  assert.equal(store.docs.size, 2);
 });
