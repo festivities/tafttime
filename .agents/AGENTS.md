@@ -356,6 +356,8 @@ Do not call `POST /StudentLogin/ReFillSession/` proactively. The site's recurrin
 
 Course Finder's server context also expires after approximately 30 minutes despite normal reads and client activity. Its endpoints then return the 55-byte JSON string `"Object reference not set to an instance of an object."` with HTTP 200 while the stale page still looks authenticated. Classify that exact sentinel as `AUTHENTICATION_REQUIRED` and use the bounded Google reauthentication flow.
 
+An ordinary authenticated Course Finder page reload shifts that deadline. Watch mode reloads the retained tab every 20 minutes, independently of the configured polling interval, while retaining the 55-byte sentinel and bounded Google flow as fallbacks.
+
 The worker waits for Course Finder `networkidle` before classifying a page as unauthenticated; checking immediately after `domcontentloaded` can falsely start the Google flow on every watch cycle while authenticated navigation is still rendering. Its four-minute keepalive sends a tiny Playwright mouse move inside the page because ArchersHub's inactivity plugin resets an internal timer from input events; updating `localStorage["IdleTime"]` alone does not reset that timer. This does not move the physical OS cursor or interact with Google.
 
 Watch mode keeps one CDP connection, browser context, and active page across polling cycles. It does not reconnect to Chrome or select `context.pages()[0]` each cycle, which had made manual refresh behavior differ from worker behavior. A fresh CDP connection is attempted only after a provider/CDP failure.

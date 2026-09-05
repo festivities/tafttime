@@ -126,27 +126,37 @@ export function validateClassRows(value: unknown): ClassRow[] {
 export async function fetchCourseFinder(
   page: Page,
   coursePrefix: string,
-  logger?: DiagnosticLogger
+  logger?: DiagnosticLogger,
+  refreshPage = false
 ): Promise<CourseFinderResult> {
   const campus = page.locator("#ddlSelectCampus");
   const academicSession = page.locator("#ddlSelectAcadSession");
   const currentUrl = new URL(page.url());
-  let authenticated =
+  const onCourseFinder =
     currentUrl.origin === ARCHERSHUB_ORIGIN &&
-    /^\/coursefinder\/index(?:\/|$)/i.test(currentUrl.pathname) &&
+    /^\/coursefinder\/index(?:\/|$)/i.test(currentUrl.pathname);
+  let authenticated =
+    !refreshPage &&
+    onCourseFinder &&
     (await campus.count()) > 0 &&
     (await academicSession.count()) > 0;
 
   if (authenticated) {
     logger?.info("course_finder.authenticated", { source: "existing_page" });
+  } else if (refreshPage) {
+    logger?.info("course_finder.refresh");
   }
 
   // OAuth can render the dashboard before the server-side session is ready.
   // Retry navigation without starting another OAuth flow.
   for (let attempt = 1; !authenticated && attempt <= 3; attempt++) {
-    await page.goto(`${ARCHERSHUB_ORIGIN}${COURSE_FINDER_PATH}`, {
-      waitUntil: "domcontentloaded",
-    });
+    if (refreshPage && onCourseFinder && attempt === 1) {
+      await page.reload({ waitUntil: "domcontentloaded" });
+    } else {
+      await page.goto(`${ARCHERSHUB_ORIGIN}${COURSE_FINDER_PATH}`, {
+        waitUntil: "domcontentloaded",
+      });
+    }
     await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(
       () => undefined
     );

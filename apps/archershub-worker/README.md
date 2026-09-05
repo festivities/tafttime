@@ -79,6 +79,8 @@ The worker deliberately does not call `/StudentLogin/ReFillSession/`. ArchersHub
 
 ArchersHub's server-side session context expires after approximately 30 minutes even while Course Finder requests remain active. Its data endpoints then return the JSON string `"Object reference not set to an instance of an object."` with HTTP 200 instead of redirecting to login. The worker recognizes this exact sentinel as an authentication failure and starts the normal bounded Google reauthentication flow.
 
+Watch mode reloads the existing authenticated Course Finder tab every 20 minutes. This ordinary page reload was observed to renew the server context, so it runs before the 30-minute boundary. The expired-session sentinel and bounded Google flow remain the fallback if reloading no longer renews it.
+
 Expected output is similar to:
 
 ```text

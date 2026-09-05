@@ -10,8 +10,10 @@ import {
   validateCourseList,
 } from "./course-finder";
 
-test("reuses a loaded Course Finder page without navigating", async () => {
+test("reuses a loaded Course Finder page and reloads it when requested", async () => {
   let navigations = 0;
+  let reloads = 0;
+  let responseIndex = 0;
   const responses = [
     { campus: "7", academicSession: "155" },
     {
@@ -35,12 +37,20 @@ test("reuses a loaded Course Finder page without navigating", async () => {
     goto: async () => {
       navigations++;
     },
-    evaluate: async () => responses.shift(),
+    reload: async () => {
+      reloads++;
+    },
+    waitForLoadState: async () => undefined,
+    waitForTimeout: async () => undefined,
+    evaluate: async () => responses[responseIndex++ % responses.length],
   } as unknown as Page;
 
   await fetchCourseFinder(page, "STSWENG");
-
   assert.equal(navigations, 0);
+
+  await fetchCourseFinder(page, "STSWENG", undefined, true);
+  assert.equal(navigations, 0);
+  assert.equal(reloads, 1);
 });
 
 test("browser activity does not call the session refresh endpoint", async () => {

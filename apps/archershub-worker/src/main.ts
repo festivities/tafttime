@@ -10,6 +10,8 @@ import { createNtfyNotifier, notifySafely, type Notifier } from "./notifier";
 import { errorCategory, type WorkerState } from "./state";
 import { createDiagnosticLogger, type DiagnosticLogger } from "./logger";
 
+const COURSE_FINDER_REFRESH_MS = 20 * 60 * 1000;
+
 function argument(name: string, fallback: string): string {
   const index = process.argv.indexOf(`--${name}`);
   return index >= 0 && process.argv[index + 1]
@@ -49,11 +51,17 @@ async function runOnce(
   login: boolean,
   account: string,
   notify: Notifier,
-  logger: DiagnosticLogger
+  logger: DiagnosticLogger,
+  refreshPage = false
 ) {
   let page = initialPage;
   try {
-    const result = await fetchCourseFinder(page, coursePrefix, logger);
+    const result = await fetchCourseFinder(
+      page,
+      coursePrefix,
+      logger,
+      refreshPage
+    );
     return logResult(result, page);
   } catch (error) {
     if (!login || !(error instanceof Error) || !error.message.includes("AUTHENTICATION_REQUIRED")) {
@@ -70,7 +78,7 @@ async function runOnce(
       await notifyMfaPrompt(notify, prompt);
     }, 5 * 60_000, logger);
 
-    const result = await fetchCourseFinder(page, coursePrefix, logger);
+    const result = await fetchCourseFinder(page, coursePrefix, logger, true);
     return logResult(result, page);
   }
 }
@@ -130,6 +138,7 @@ async function runWatch(
   let state: WorkerState | undefined;
   let loginAttemptedForIncident = false;
   let activePage: Page | undefined;
+  let nextRefreshAt: number | undefined;
   let keepAliveInFlight = false;
   let connection = await connectPage(cdp);
 
@@ -158,6 +167,7 @@ async function runWatch(
   }, 4 * 60 * 1000);
 
   for (;;) {
+    const refreshPage = nextRefreshAt !== undefined && Date.now() >= nextRefreshAt;
     try {
       const result = await runOnce(
         connection.context,
@@ -166,9 +176,13 @@ async function runWatch(
         login && !loginAttemptedForIncident,
         account,
         notify,
-        logger
+        logger,
+        refreshPage
       );
       activePage = result.page;
+      if (!nextRefreshAt || refreshPage) {
+        nextRefreshAt = Date.now() + COURSE_FINDER_REFRESH_MS;
+      }
       if (state !== "AUTHENTICATED") {
         await notifySafely(
           notify,
@@ -211,9 +225,15 @@ async function runWatch(
           });
         }
       }
+      if (refreshPage) nextRefreshAt = Date.now() + intervalMs;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    const refreshDelay = nextRefreshAt
+      ? Math.max(1_000, nextRefreshAt - Date.now())
+      : intervalMs;
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.min(intervalMs, refreshDelay))
+    );
   }
 }
 
@@ -231,6 +251,7 @@ async function main(): Promise<void> {
     cdp,
     coursePrefix,
     intervalSeconds: numberArgument("interval-seconds", 900),
+    refreshSeconds: COURSE_FINDER_REFRESH_MS / 1000,
   });
 
   if (login && !account) {
