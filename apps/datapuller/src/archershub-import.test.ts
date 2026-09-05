@@ -1,4 +1,5 @@
 import { createArchersHubSnapshot } from "archershub-worker/snapshot";
+import mongoose from "mongoose";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -87,6 +88,10 @@ function fakeStore() {
 }
 
 const STSWENG = "STSWENG - ADVANCED SOFTWARE ENGINEERING";
+
+test("registers only the isolated ArchersHub model", () => {
+  assert.deepEqual(mongoose.modelNames(), ["archershub-offering"]);
+});
 
 test("builds an exact single-scope filter", () => {
   assert.deepEqual(getArchersHubOfferingFilter(bundleFor(367, STSWENG)), {

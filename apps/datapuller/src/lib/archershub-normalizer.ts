@@ -8,7 +8,7 @@ import type {
   IArchersHubMeeting,
   IArchersHubOfferingItem,
   IArchersHubSection,
-} from "@repo/common/models";
+} from "@repo/common/models/archershub-offering";
 
 type Modality = "in-person" | "online" | "hybrid";
 

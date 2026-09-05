@@ -2,7 +2,7 @@ import { createArchersHubSnapshot } from "archershub-worker/snapshot";
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ArchersHubOfferingModel } from "@repo/common/models";
+import { ArchersHubOfferingModel } from "@repo/common/models/archershub-offering";
 
 import { normalizeArchersHubSnapshot } from "./archershub-normalizer";
 

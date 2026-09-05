@@ -4,6 +4,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./models": "./src/models/index.ts",
+    "./models/archershub-offering": "./src/models/archershub-offering.ts",
     "./lib/departmentNicknames": "./src/lib/departmentNicknames.ts"
   },
   "devDependencies": {

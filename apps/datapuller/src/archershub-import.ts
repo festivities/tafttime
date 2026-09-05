@@ -7,7 +7,7 @@ import { parseArgs } from "node:util";
 import {
   ArchersHubOfferingModel,
   type IArchersHubOfferingItem,
-} from "@repo/common/models";
+} from "@repo/common/models/archershub-offering";
 
 import { readArchersHubSnapshot } from "./archershub-snapshot";
 import {
