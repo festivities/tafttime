@@ -4,80 +4,17 @@ import {
   validateArchersHubSnapshot,
 } from "archershub-worker/snapshot";
 
-type Campus = "Manila" | "Laguna";
+import type {
+  IArchersHubMeeting,
+  IArchersHubOfferingItem,
+  IArchersHubSection,
+} from "@repo/common/models";
+
 type Modality = "in-person" | "online" | "hybrid";
 
-export type NormalizedMeeting = {
-  day: string;
-  startTime: string;
-  endTime: string;
-  location: string | null;
-  modality: Exclude<Modality, "hybrid"> | null;
-};
-
-export type NormalizedArchersHubSection = {
-  identity: {
-    provider: "archershub";
-    requestCampusId: string;
-    academicSessionId: string;
-    courseCreationId: string;
-    sectionCreationId: string;
-    batchCreationId: string | null;
-  };
-  sectionName: string | null;
-  subjectType: string | null;
-  credits: number | null;
-  campus: {
-    requestCampusId: string;
-    sourceCampus: string | null;
-    inferredCampus: Campus | null;
-    inference: "section-name-x-prefix" | "section-name-non-x" | null;
-  };
-  capacity: number | null;
-  updatedCapacity: number | null;
-  enlisted: number | null;
-  approvedCount: number | null;
-  availableSeats: number | null;
-  teachers: string[];
-  rawSchedules: string[];
-  scheduleStatus: "missing" | "parsed" | "unparsed";
-  meetings: NormalizedMeeting[] | null;
-  modality: Modality | null;
-  fragments: Record<string, unknown>[];
-};
-
-export type NormalizedArchersHubBundle = {
-  provider: "archershub";
-  retrievedAt: string;
-  offering: {
-    identity: {
-      provider: "archershub";
-      requestCampusId: string;
-      academicSessionId: string;
-      courseCreationId: string;
-    };
-    course: {
-      sourceCourseId: string;
-      courseCode: string | null;
-      title: string;
-      sourceName: string;
-    };
-    term: {
-      sourceAcademicSessionId: string;
-      label: string | null;
-      academicYear: string | null;
-      ordinal: 1 | 2 | 3 | null;
-      sourceStartDate: string | null;
-      sourceEndDate: string | null;
-      parseStatus: "missing" | "parsed" | "unparsed";
-      timezone: "Asia/Manila";
-    };
-    academicCareer: null;
-    gradingBasis: null;
-    finalExam: null;
-    sections: NormalizedArchersHubSection[];
-  };
-};
+export type NormalizedMeeting = IArchersHubMeeting;
+export type NormalizedArchersHubSection = IArchersHubSection;
+export type NormalizedArchersHubBundle = IArchersHubOfferingItem;
 
 const DAYS = [
   "MONDAY",

@@ -23,3 +23,4 @@ export * from "./nav-item";
 export * from "./targeted-message";
 export * from "./catalog-class";
 export * from "./tracking-event";
+export * from "./archershub-offering";

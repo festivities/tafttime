@@ -6,7 +6,7 @@ Owner-approved planning baseline: September 2026. This is a temporary handoff fo
 
 The authenticated ArchersHub worker is already implemented. Its twenty-minute reload strategy survived an observed ninety-minute unattended run without post-startup reauthentication. Do not restart authentication research or claim indefinite session lifetime from that observation.
 
-Phases A-E and the pure-normalizer slice of Phase F were implemented in September 2026. The worker validates and atomically publishes a versioned single-course snapshot, datapuller can inspect and normalize it offline through the shared contract, provider boundaries reject malformed/ambiguous responses, and focused tests cover publication preservation, secret-safe summaries, scoped row grouping, schedules, campus, credits, availability, and explicit unknowns. The shared-model/GraphQL schema migration and Phases G-J remain unimplemented. Do not silently expand a single-course export into a complete catalog or production import.
+Phases A-F were implemented in September 2026. The worker validates and atomically publishes a versioned single-course snapshot; datapuller inspects and normalizes it offline; and the shared `archershub_offerings` model validates a persistence-ready DLSU document with a unique provider/campus/session/course scope. Focused tests cover publication preservation, secret-safe summaries, scoped row grouping, schedules, campus, credits, availability, explicit unknowns, and model invariants. Phases G-J remain unimplemented. Do not silently expand a single-course export into a complete catalog or production import.
 
 ## Product Decisions
 
@@ -279,22 +279,22 @@ Formula decision is closed: CAPACITY - ENLISTED. Validate actual numeric represe
 
 Write a reviewed fixture-to-domain mapping table from the approved decisions above before database code.
 
-Status: the safe database-free slice is implemented in `apps/datapuller/src/lib/archershub-normalizer.ts`. It validates the snapshot, emits one scoped term offering, groups colliding source rows, preserves raw fragments, deduplicates teachers/meetings, parses the confirmed schedule grammar, and retains unsupported values as `null`. The live STSWENG snapshot normalized to six sections with parsed schedules. `START_DATE`/`END_DATE` remain preserved source strings because their numeric date ordering is not yet authoritative. Empty class snapshots intentionally have unknown term label/dates because schema version 1 carries no selected-session label outside class rows.
+Status: complete for the ingestion/persistence boundary. `apps/datapuller/src/lib/archershub-normalizer.ts` validates the snapshot, emits one scoped term offering, groups colliding source rows, preserves raw fragments, deduplicates teachers/meetings, parses the confirmed schedule grammar, and retains unsupported values as `null`. `packages/common/src/models/archershub-offering.ts` stores that shape without forcing it through incompatible Berkeley collections. The live STSWENG snapshot normalized to six sections with parsed schedules. `START_DATE`/`END_DATE` remain preserved source strings because their numeric date ordering is not yet authoritative. Empty class snapshots intentionally have unknown term label/dates because schema version 1 carries no selected-session label outside class rows.
 
-1. Add a pure ArchersHub normalizer under apps/datapuller/src/lib/.
-2. Reuse packages/common models only where their meaning fits; revise incompatible Berkeley assumptions deliberately.
-3. Add scoped section-group/provenance fields and unique constraints only on the full approved current-term grouping key; preserve colliding raw rows as fragments.
-4. Replace semester terminology/contracts with numbered DLSU terms across shared models, GraphQL, resolvers, frontend ordering, and display.
-5. Apply the provisional section campus heuristic with provenance and raw campus preservation.
-6. Parse credits and availability using approved rules; retain unsupported values as unknown.
-7. Make unsupported inherited GraphQL fields nullable where consumers can handle absence. Use `null` for unknown `gradingBasis`, `finalExam`, and modality; remove the requirement for a fabricated primary section; expose parsed meeting collections only when parsing succeeded, alongside raw schedule/parse status where needed. Hide any feature that cannot operate truthfully with absent data.
-8. Keep institutional rules at the provider/domain boundary; do not implement speculative CSB support.
+1. The pure ArchersHub normalizer lives under `apps/datapuller/src/lib/`.
+2. The dedicated shared `ArchersHubOfferingModel` is the Phase G write target because the inherited course/class/section schemas require incompatible Berkeley identities.
+3. The model has one unique offering index on provider + request campus + academic session + course ID. Embedded section validation enforces matching scope and unique section + batch identities while preserving colliding raw rows as fragments.
+4. The model stores academic year and numbered DLSU term ordinal without adding semester aliases. Broad GraphQL/resolver/frontend terminology changes belong to Phase H when this collection becomes publicly readable.
+5. The provisional section campus heuristic retains both provenance and raw campus.
+6. Credits and availability use approved validation; unsupported values remain null.
+7. Academic career, grading basis, and final exam are enforced as null. Parsed meetings are present only when schedule parsing succeeds; no primary section is fabricated. GraphQL nullable-field changes remain Phase H work.
+8. Institutional rules remain at the provider/domain boundary; no speculative CSB support exists.
 
-Acceptance for the pure slice is complete: mapper tests establish deterministic scoped section groups, colliding-row aggregation, term/campus mapping, numeric edge cases, supported schedules, and explicit unknown handling without network or MongoDB. Shared Mongoose and GraphQL changes in items 2-4 and 7 still require one coordinated migration before Phase G writes.
+Acceptance is complete: mapper/model tests establish deterministic scoped section groups, colliding-row aggregation, term/campus mapping, numeric edge cases, supported schedules, explicit unknown handling, persistence-shape validation, and unique-scope indexes without network or MongoDB.
 
 ## Phase G: Isolated DLSU Import
 
-1. Import into an explicitly isolated DLSU development database first.
+1. Import normalized documents into the `archershub_offerings` collection in an explicitly isolated DLSU development database first.
 2. Validate the complete intended scope before writes and preserve retrieval provenance.
 3. Use transactions/staging appropriate to the existing deployment; publish atomically at the exact declared scope.
 4. Never feed a one-course snapshot into a term-wide replacement job.

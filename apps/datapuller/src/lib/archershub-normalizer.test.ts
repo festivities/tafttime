@@ -2,6 +2,8 @@ import { createArchersHubSnapshot } from "archershub-worker/snapshot";
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { ArchersHubOfferingModel } from "@repo/common/models";
+
 import { normalizeArchersHubSnapshot } from "./archershub-normalizer";
 
 const RETRIEVED_AT = "2026-09-05T15:53:08.741Z";
@@ -185,4 +187,66 @@ test("does not fabricate ambiguous course codes or empty-snapshot term data", ()
     parseStatus: "missing",
     timezone: "Asia/Manila",
   });
+});
+
+test("fits the shared persistence schema and enforces scoped sections", async () => {
+  const normalized = normalizeArchersHubSnapshot(snapshot([row()]));
+  const document = new ArchersHubOfferingModel(normalized);
+  await document.validate();
+  assert.equal(document.offering.academicCareer, null);
+  assert.equal(document.offering.sections[0].fragments[0].SECTION_NAME, "S06");
+
+  const duplicate = structuredClone(normalized);
+  duplicate.offering.sections.push(
+    structuredClone(duplicate.offering.sections[0])
+  );
+  await assert.rejects(
+    new ArchersHubOfferingModel(duplicate).validate(),
+    /Duplicate section identity within offering/
+  );
+
+  const wrongScope = structuredClone(normalized);
+  wrongScope.offering.sections[0].identity.requestCampusId = "8";
+  await assert.rejects(
+    new ArchersHubOfferingModel(wrongScope).validate(),
+    /Section identity did not match offering scope/
+  );
+
+  const wrongAvailability = structuredClone(normalized);
+  wrongAvailability.offering.sections[0].availableSeats = 999;
+  await assert.rejects(
+    new ArchersHubOfferingModel(wrongAvailability).validate(),
+    /Available seats did not match capacity minus enlisted/
+  );
+
+  const invalidCredits = structuredClone(normalized);
+  invalidCredits.offering.sections[0].credits = 6;
+  await assert.rejects(
+    new ArchersHubOfferingModel(invalidCredits).validate(),
+    /Expected whole-number credits from 0 through 5 or null/
+  );
+
+  const unsupportedValue = structuredClone(normalized);
+  Reflect.set(unsupportedValue.offering, "gradingBasis", "Graded");
+  await assert.rejects(
+    new ArchersHubOfferingModel(unsupportedValue).validate(),
+    /Expected unavailable source data to remain null/
+  );
+
+  const uniqueIndex = ArchersHubOfferingModel.schema
+    .indexes()
+    .find(([, options]) => options.name === "unique_archershub_offering_scope");
+  assert.deepEqual(uniqueIndex, [
+    {
+      "offering.identity.provider": 1,
+      "offering.identity.requestCampusId": 1,
+      "offering.identity.academicSessionId": 1,
+      "offering.identity.courseCreationId": 1,
+    },
+    {
+      unique: true,
+      name: "unique_archershub_offering_scope",
+      background: true,
+    },
+  ]);
 });
