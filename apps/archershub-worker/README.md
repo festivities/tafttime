@@ -73,11 +73,9 @@ The worker sends one notification when it enters a new state:
 
 The worker attempts Google account selection only once per authentication incident. After that it pauses login attempts while polling, so inconsistent Google phone notifications do not cause repeated OAuth requests. `--watch` without `--login` is valid and will alert on expiry while waiting for manual recovery; rerun with `--login` when account selection must be automated.
 
-In watch mode the worker also keeps the ArchersHub portal session alive every five minutes. It runs the portal's own read-only `POST /StudentLogin/ReFillSession/` endpoint inside the authenticated page context and updates the portal's existing `localStorage["IdleTime"]` marker. This is intended to prevent the portal's 10-minute inactivity warning and 2-minute logout while the worker is actively maintaining the session. It does not simulate mouse/keyboard input, touch the Google session, enter credentials, approve MFA, or navigate to the URL returned by the endpoint. If the keepalive returns login HTML, a redirect, or an error, normal ntfy state handling takes over.
+Every four minutes, watch mode sends a tiny Playwright mouse move inside the browser page and updates ArchersHub's existing `localStorage["IdleTime"]` marker. Together these reset the portal's client-side inactivity timers without moving the physical cursor or interacting with Google.
 
-`ReFillSession` normally returns authenticated `StudentDashboard` HTML with HTTP 200 rather than JSON. That is a successful keepalive. Login-page HTML, unexpected HTML destinations, and non-2xx responses are failures. The captured Oracle log showed the old implementation falsely rejecting two valid dashboard responses; this case is now covered by regression tests.
-
-The keepalive also sends a tiny Playwright mouse move inside the browser page because ArchersHub's inactivity plugin resets its internal timer from input events; changing `localStorage["IdleTime"]` alone is insufficient. This affects only the browser page, does not move your physical mouse, and does not interact with Google.
+The worker deliberately does not call `/StudentLogin/ReFillSession/`. ArchersHub's own recurring call to that endpoint is commented out, and the active site calls it only when a user chooses `Continue` in the expiry warning. Calling it proactively returned dashboard HTML but cleared the server-side context used by Course Finder, making later list requests return empty data.
 
 Expected output is similar to:
 

@@ -4,16 +4,15 @@ import type { Page } from "playwright";
 
 import {
   fetchCourseFinder,
-  isSuccessfulKeepaliveResponse,
+  keepArchersHubSessionAlive,
   validateClassRows,
   validateCourseList,
 } from "./course-finder";
 
-test("reuses the last successful selection when the page resets", async () => {
+test("reuses a loaded Course Finder page without navigating", async () => {
   let navigations = 0;
-  const forms: Record<string, string>[] = [];
   const responses = [
-    { campus: "0", academicSession: "0" },
+    { campus: "7", academicSession: "155" },
     {
       status: 200,
       url: "https://archershub.dlsu.edu.ph/CourseFinder/GetCourseList/",
@@ -35,22 +34,30 @@ test("reuses the last successful selection when the page resets", async () => {
     goto: async () => {
       navigations++;
     },
-    evaluate: async (
-      _callback: unknown,
-      argument?: { form?: Record<string, string> }
-    ) => {
-      if (argument?.form) forms.push(argument.form);
-      return responses.shift();
+    evaluate: async () => responses.shift(),
+  } as unknown as Page;
+
+  await fetchCourseFinder(page, "STSWENG");
+
+  assert.equal(navigations, 0);
+});
+
+test("browser activity does not call the session refresh endpoint", async () => {
+  let moved = false;
+  const page = {
+    mouse: {
+      move: async () => {
+        moved = true;
+      },
+    },
+    evaluate: async (callback: () => unknown) => {
+      assert.doesNotMatch(callback.toString(), /fetch|ReFillSession/);
     },
   } as unknown as Page;
 
-  await fetchCourseFinder(page, "STSWENG", {
-    campus: "7",
-    academicSession: "155",
-  });
+  await keepArchersHubSessionAlive(page);
 
-  assert.equal(navigations, 0);
-  assert.deepEqual(forms[0], { Campusno: "7", AcademicSession: "155" });
+  assert.equal(moved, true);
 });
 
 test("validates a non-empty course list", () => {
@@ -70,26 +77,4 @@ test("rejects malformed course lists", () => {
 
 test("rejects non-array class responses", () => {
   assert.throws(() => validateClassRows({ error: "login" }));
-});
-
-test("accepts the authenticated dashboard HTML returned by keepalive", () => {
-  assert.equal(
-    isSuccessfulKeepaliveResponse({
-      status: 200,
-      url: "https://archershub.dlsu.edu.ph/StudentDashboard",
-      contentType: "text/html; charset=utf-8",
-    }),
-    true
-  );
-});
-
-test("rejects a keepalive response redirected to login", () => {
-  assert.equal(
-    isSuccessfulKeepaliveResponse({
-      status: 200,
-      url: "https://archershub.dlsu.edu.ph/",
-      contentType: "text/html; charset=utf-8",
-    }),
-    false
-  );
 });

@@ -11,50 +11,18 @@ import type {
 
 export const COURSE_FINDER_PATH = "/CourseFinder/Index";
 
-export function isSuccessfulKeepaliveResponse(response: {
-  status: number;
-  url: string;
-  contentType: string;
-}): boolean {
-  if (response.status < 200 || response.status >= 300) return false;
-  if (isLoginUrl(response.url)) return false;
-  if (/text\/html/i.test(response.contentType)) {
-    return /\/studentdashboard(?:\/|$)/i.test(new URL(response.url).pathname);
-  }
-  return true;
-}
-
 export async function keepArchersHubSessionAlive(
   page: Page,
   logger?: DiagnosticLogger
 ): Promise<void> {
   const started = Date.now();
   await page.mouse.move(1, 1);
-  const response = await page.evaluate(async () => {
+  await page.evaluate(() => {
     localStorage.setItem("IdleTime", new Date().toString());
-    const result = await fetch("/StudentLogin/ReFillSession/", {
-      method: "POST",
-      credentials: "same-origin",
-    });
-    return {
-      status: result.status,
-      url: result.url,
-      contentType: result.headers.get("content-type") ?? "",
-      bodyBytes: (await result.text()).length,
-    };
   });
-
-  logger?.info("session.keepalive", {
-    status: response.status,
-    url: response.url,
-    contentType: response.contentType,
-    bodyBytes: response.bodyBytes,
+  logger?.info("session.activity", {
     durationMs: Date.now() - started,
   });
-
-  if (!isSuccessfulKeepaliveResponse(response)) {
-    throw new Error("AUTHENTICATION_REQUIRED: session keepalive failed");
-  }
 }
 
 export async function postForm<T>(
@@ -148,7 +116,6 @@ export function validateClassRows(value: unknown): ClassRow[] {
 export async function fetchCourseFinder(
   page: Page,
   coursePrefix: string,
-  previousSelection?: { campus: string; academicSession: string },
   logger?: DiagnosticLogger
 ): Promise<CourseFinderResult> {
   const campus = page.locator("#ddlSelectCampus");
@@ -202,30 +169,22 @@ export async function fetchCourseFinder(
   await campus.waitFor({ state: "attached" });
   await academicSession.waitFor({ state: "attached" });
 
-  const pageSelection = await page.evaluate(() => ({
+  const selection = await page.evaluate(() => ({
     campus: (document.querySelector("#ddlSelectCampus") as HTMLSelectElement)
       ?.value,
     academicSession: (
       document.querySelector("#ddlSelectAcadSession") as HTMLSelectElement
     )?.value,
   }));
-  const selection =
-    pageSelection.campus &&
-    pageSelection.campus !== "0" &&
-    pageSelection.academicSession &&
-    pageSelection.academicSession !== "0"
-      ? {
-          campus: pageSelection.campus,
-          academicSession: pageSelection.academicSession,
-        }
-      : previousSelection;
 
-  if (!selection) {
+  if (
+    !selection.campus ||
+    selection.campus === "0" ||
+    !selection.academicSession ||
+    selection.academicSession === "0"
+  ) {
     throw new Error("INVALID_RESPONSE: Course Finder selection was incomplete");
   }
-  logger?.info("course_finder.selection", {
-    source: selection === previousSelection ? "previous_success" : "page",
-  });
 
   const list = validateCourseList(
     await postForm<CourseListResponse>(page, "/CourseFinder/GetCourseList/", {
