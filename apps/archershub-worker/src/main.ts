@@ -49,11 +49,17 @@ async function runOnce(
   login: boolean,
   account: string,
   notify: Notifier,
-  logger: DiagnosticLogger
-): Promise<{ courses: number; classes: number; page: Page }> {
+  logger: DiagnosticLogger,
+  previousSelection?: { campus: string; academicSession: string }
+) {
   let page = initialPage;
   try {
-    const result = await fetchCourseFinder(page, coursePrefix, logger);
+    const result = await fetchCourseFinder(
+      page,
+      coursePrefix,
+      previousSelection,
+      logger
+    );
     return logResult(result, page);
   } catch (error) {
     if (!login || !(error instanceof Error) || !error.message.includes("AUTHENTICATION_REQUIRED")) {
@@ -70,7 +76,12 @@ async function runOnce(
       await notifyMfaPrompt(notify, prompt);
     }, 5 * 60_000, logger);
 
-    const result = await fetchCourseFinder(page, coursePrefix, logger);
+    const result = await fetchCourseFinder(
+      page,
+      coursePrefix,
+      previousSelection,
+      logger
+    );
     return logResult(result, page);
   }
 }
@@ -78,7 +89,7 @@ async function runOnce(
 function logResult(
   result: Awaited<ReturnType<typeof fetchCourseFinder>>,
   page: Page
-): { courses: number; classes: number; page: Page } {
+) {
     const sections = result.classes
       .map((row) => row.SECTION_NAME)
       .filter((section): section is string => typeof section === "string");
@@ -91,7 +102,15 @@ function logResult(
     );
     console.log(`Selectable classes: ${result.classes.length}`);
     console.log(`Sections: ${sections.join(", ") || "none"}`);
-    return { courses: result.courses.length, classes: result.classes.length, page };
+    return {
+      courses: result.courses.length,
+      classes: result.classes.length,
+      selection: {
+        campus: result.campus,
+        academicSession: result.academicSession,
+      },
+      page,
+    };
 }
 
 async function notifyMfaPrompt(
@@ -126,6 +145,7 @@ async function runWatch(
   let state: WorkerState | undefined;
   let loginAttemptedForIncident = false;
   let activePage: Page | undefined;
+  let previousSelection: { campus: string; academicSession: string } | undefined;
   let keepAliveInFlight = false;
   let connection = await connectPage(cdp);
 
@@ -162,9 +182,11 @@ async function runWatch(
         login && !loginAttemptedForIncident,
         account,
         notify,
-        logger
+        logger,
+        previousSelection
       );
       activePage = result.page;
+      previousSelection = result.selection;
       if (state !== "AUTHENTICATED") {
         await notifySafely(
           notify,

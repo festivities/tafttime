@@ -148,6 +148,7 @@ export function validateClassRows(value: unknown): ClassRow[] {
 export async function fetchCourseFinder(
   page: Page,
   coursePrefix: string,
+  previousSelection?: { campus: string; academicSession: string },
   logger?: DiagnosticLogger
 ): Promise<CourseFinderResult> {
   const campus = page.locator("#ddlSelectCampus");
@@ -201,17 +202,30 @@ export async function fetchCourseFinder(
   await campus.waitFor({ state: "attached" });
   await academicSession.waitFor({ state: "attached" });
 
-  const selection = await page.evaluate(() => ({
+  const pageSelection = await page.evaluate(() => ({
     campus: (document.querySelector("#ddlSelectCampus") as HTMLSelectElement)
       ?.value,
     academicSession: (
       document.querySelector("#ddlSelectAcadSession") as HTMLSelectElement
     )?.value,
   }));
+  const selection =
+    pageSelection.campus &&
+    pageSelection.campus !== "0" &&
+    pageSelection.academicSession &&
+    pageSelection.academicSession !== "0"
+      ? {
+          campus: pageSelection.campus,
+          academicSession: pageSelection.academicSession,
+        }
+      : previousSelection;
 
-  if (!selection.campus || !selection.academicSession) {
+  if (!selection) {
     throw new Error("INVALID_RESPONSE: Course Finder selection was incomplete");
   }
+  logger?.info("course_finder.selection", {
+    source: selection === previousSelection ? "previous_success" : "page",
+  });
 
   const list = validateCourseList(
     await postForm<CourseListResponse>(page, "/CourseFinder/GetCourseList/", {

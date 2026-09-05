@@ -9,10 +9,11 @@ import {
   validateCourseList,
 } from "./course-finder";
 
-test("reuses a loaded Course Finder page without navigating", async () => {
+test("reuses the last successful selection when the page resets", async () => {
   let navigations = 0;
+  const forms: Record<string, string>[] = [];
   const responses = [
-    { campus: "7", academicSession: "155" },
+    { campus: "0", academicSession: "0" },
     {
       status: 200,
       url: "https://archershub.dlsu.edu.ph/CourseFinder/GetCourseList/",
@@ -34,12 +35,22 @@ test("reuses a loaded Course Finder page without navigating", async () => {
     goto: async () => {
       navigations++;
     },
-    evaluate: async () => responses.shift(),
+    evaluate: async (
+      _callback: unknown,
+      argument?: { form?: Record<string, string> }
+    ) => {
+      if (argument?.form) forms.push(argument.form);
+      return responses.shift();
+    },
   } as unknown as Page;
 
-  await fetchCourseFinder(page, "STSWENG");
+  await fetchCourseFinder(page, "STSWENG", {
+    campus: "7",
+    academicSession: "155",
+  });
 
   assert.equal(navigations, 0);
+  assert.deepEqual(forms[0], { Campusno: "7", AcademicSession: "155" });
 });
 
 test("validates a non-empty course list", () => {
