@@ -111,13 +111,15 @@ ROOOMNAME
 BATCHNAME
 ```
 
-The page renders these fields as course type, teacher, credits, section, schedules, enrollment capacity, enrolled count, remark, and action columns. `CAPACITY` and `ENLISTED` are separate values: a class can be full even when the endpoint returns it successfully. `UPDATED_CAPACITY` and `APPROVED_COUNT` may affect how the portal displays availability, so the normalization logic must establish the provider's exact seat-availability rule instead of assuming `CAPACITY - ENLISTED` is sufficient.
+The page renders these fields as course type, teacher, credits, section, schedules, enrollment capacity, enrolled count, remark, and action columns. `CAPACITY` and `ENLISTED` are separate values: a class can be full even when the endpoint returns it successfully. The owner-approved available-seat formula is `CAPACITY - ENLISTED`; preserve `UPDATED_CAPACITY` and `APPROVED_COUNT` but do not use them in that calculation.
+
+`SECTION_CREATION_ID` is not unique per response row, even inside one course/campus/session. In the inspected current-term Manila CCPROG1 table, IDs `2130`, `2127`, `1391`, `2110`, and `2112` each appeared on multiple rows. A repeated ID can have different teacher or schedule text, while each row's Add button uses the same encoded `COURSE_CREATION_ID|SECTION_CREATION_ID|BATCH_CREATION_ID` key. Treat these rows as raw teacher/meeting fragments of one selectable section: preserve them, group by the full scoped selection key, and aggregate/deduplicate teachers and meetings. Do not impose uniqueness on `SECTION_CREATION_ID` alone or normalize every row into a separate selectable section.
 
 ## Browser Behavior
 
 Changing campus or academic session clears the course select and class table. Changing course schedules `loadCFData()` asynchronously. The page uses jQuery AJAX and Select2; a native DOM `change` event is enough to trigger the request when testing, but a production worker should wait for the response/table state rather than sleep a fixed duration.
 
-The page also calls `/CourseFinder/GetScheduleData/` for the schedule modal. That endpoint was not part of the requested investigation and is not documented as an ingestion dependency yet.
+The page calls `POST /CourseFinder/GetScheduleData/` when the user clicks `#btnViewSchedule` after adding at least one section. It posts the selected course, section, batch, and campus IDs plus the current session and date range to aggregate the user's chosen schedule. It is not required for first-pass ingestion: parse each `GetCFData` row's `SCHEDULE`, then aggregate colliding row fragments into the selectable section.
 
 ## Request Implementation Guidance
 

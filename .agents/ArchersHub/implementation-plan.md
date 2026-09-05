@@ -84,7 +84,7 @@ Only `AUTHENTICATED` may run the catalog pull. `EXPIRED` pauses pulls and alerts
 - At least one valid course produces a validated `GetCFData` class array.
 - Invalid campus/session/course IDs fail visibly and do not publish empty replacement data.
 - A valid course with no offerings is distinguished from an authentication failure, malformed request, or provider outage.
-- Seat availability is based on the provider's confirmed semantics for `CAPACITY`, `UPDATED_CAPACITY`, `ENLISTED`, and `APPROVED_COUNT`; do not assume raw capacity minus enrolled is authoritative.
+- Seat availability is `CAPACITY - ENLISTED`, owner-approved. Preserve `UPDATED_CAPACITY` and `APPROVED_COUNT` as unused source observations.
 - Session expiry pauses the worker and emits an alert.
 - Restarting the worker reuses the persistent profile without cookie export.
 - A fresh profile requires interactive sign-in.
