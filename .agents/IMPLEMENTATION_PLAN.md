@@ -6,7 +6,7 @@ Owner-approved planning baseline: September 2026. This is a temporary handoff fo
 
 The authenticated ArchersHub worker is already implemented. Its twenty-minute reload strategy survived an observed ninety-minute unattended run without post-startup reauthentication. Do not restart authentication research or claim indefinite session lifetime from that observation.
 
-Phases A-E were implemented in September 2026: the worker now validates and atomically publishes a versioned single-course snapshot, datapuller can inspect it offline through the shared contract, provider boundaries reject malformed/ambiguous responses, and focused tests cover publication preservation and secret-safe summaries. Later phases remain unimplemented. Do not silently expand a single-course export into a complete catalog or production import.
+Phases A-E and the pure-normalizer slice of Phase F were implemented in September 2026. The worker validates and atomically publishes a versioned single-course snapshot, datapuller can inspect and normalize it offline through the shared contract, provider boundaries reject malformed/ambiguous responses, and focused tests cover publication preservation, secret-safe summaries, scoped row grouping, schedules, campus, credits, availability, and explicit unknowns. The shared-model/GraphQL schema migration and Phases G-J remain unimplemented. Do not silently expand a single-course export into a complete catalog or production import.
 
 ## Product Decisions
 
@@ -279,6 +279,8 @@ Formula decision is closed: CAPACITY - ENLISTED. Validate actual numeric represe
 
 Write a reviewed fixture-to-domain mapping table from the approved decisions above before database code.
 
+Status: the safe database-free slice is implemented in `apps/datapuller/src/lib/archershub-normalizer.ts`. It validates the snapshot, emits one scoped term offering, groups colliding source rows, preserves raw fragments, deduplicates teachers/meetings, parses the confirmed schedule grammar, and retains unsupported values as `null`. The live STSWENG snapshot normalized to six sections with parsed schedules. `START_DATE`/`END_DATE` remain preserved source strings because their numeric date ordering is not yet authoritative. Empty class snapshots intentionally have unknown term label/dates because schema version 1 carries no selected-session label outside class rows.
+
 1. Add a pure ArchersHub normalizer under apps/datapuller/src/lib/.
 2. Reuse packages/common models only where their meaning fits; revise incompatible Berkeley assumptions deliberately.
 3. Add scoped section-group/provenance fields and unique constraints only on the full approved current-term grouping key; preserve colliding raw rows as fragments.
@@ -288,7 +290,7 @@ Write a reviewed fixture-to-domain mapping table from the approved decisions abo
 7. Make unsupported inherited GraphQL fields nullable where consumers can handle absence. Use `null` for unknown `gradingBasis`, `finalExam`, and modality; remove the requirement for a fabricated primary section; expose parsed meeting collections only when parsing succeeded, alongside raw schedule/parse status where needed. Hide any feature that cannot operate truthfully with absent data.
 8. Keep institutional rules at the provider/domain boundary; do not implement speculative CSB support.
 
-Acceptance: pure mapper tests establish deterministic scoped section groups, colliding-row aggregation, term/campus mapping, numeric edge cases, supported schedules, and explicit unknown handling without network or MongoDB.
+Acceptance for the pure slice is complete: mapper tests establish deterministic scoped section groups, colliding-row aggregation, term/campus mapping, numeric edge cases, supported schedules, and explicit unknown handling without network or MongoDB. Shared Mongoose and GraphQL changes in items 2-4 and 7 still require one coordinated migration before Phase G writes.
 
 ## Phase G: Isolated DLSU Import
 
