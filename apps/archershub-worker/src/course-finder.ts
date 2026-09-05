@@ -71,18 +71,28 @@ export async function postForm<T>(
     throw new Error(`PROVIDER_ERROR: ${path} returned HTTP ${response.status}`);
   }
 
+  let value: unknown;
   try {
-    logger?.info("provider.response", {
-      path,
-      status: response.status,
-      durationMs: Date.now() - started,
-      bodyBytes: response.text.length,
-    });
-    return JSON.parse(response.text) as T;
+    value = JSON.parse(response.text);
   } catch {
     logger?.error("provider.invalid_json", { path });
     throw new Error(`INVALID_RESPONSE: ${path} did not return JSON`);
   }
+
+  logger?.info("provider.response", {
+    path,
+    status: response.status,
+    durationMs: Date.now() - started,
+    bodyBytes: response.text.length,
+  });
+  if (value === "Object reference not set to an instance of an object.") {
+    logger?.warn("provider.authentication_required", {
+      path,
+      reason: "expired_session_context",
+    });
+    throw new Error("AUTHENTICATION_REQUIRED: ArchersHub session context expired");
+  }
+  return value as T;
 }
 
 export function validateCourseList(value: CourseListResponse): Course[] {

@@ -77,6 +77,8 @@ Every four minutes, watch mode sends a tiny Playwright mouse move inside the bro
 
 The worker deliberately does not call `/StudentLogin/ReFillSession/`. ArchersHub's own recurring call to that endpoint is commented out, and the active site calls it only when a user chooses `Continue` in the expiry warning. Calling it proactively returned dashboard HTML but cleared the server-side context used by Course Finder, making later list requests return empty data.
 
+ArchersHub's server-side session context expires after approximately 30 minutes even while Course Finder requests remain active. Its data endpoints then return the JSON string `"Object reference not set to an instance of an object."` with HTTP 200 instead of redirecting to login. The worker recognizes this exact sentinel as an authentication failure and starts the normal bounded Google reauthentication flow.
+
 Expected output is similar to:
 
 ```text
