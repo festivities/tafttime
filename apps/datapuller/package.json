@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "archershub:inspect": "tsx src/archershub-snapshot.ts",
+    "archershub:import": "tsx src/archershub-import.ts",
     "build": "tsc --noEmit",
     "main": "tsx src/main.ts",
     "test": "tsx --test \"src/**/*.test.ts\"",

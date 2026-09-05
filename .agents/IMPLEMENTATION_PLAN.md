@@ -6,7 +6,7 @@ Owner-approved planning baseline: September 2026. This is a temporary handoff fo
 
 The authenticated ArchersHub worker is already implemented. Its twenty-minute reload strategy survived an observed ninety-minute unattended run without post-startup reauthentication. Do not restart authentication research or claim indefinite session lifetime from that observation.
 
-Phases A-F were implemented in September 2026. The worker validates and atomically publishes a versioned single-course snapshot; datapuller inspects and normalizes it offline; and the shared `archershub_offerings` model validates a persistence-ready DLSU document with a unique provider/campus/session/course scope. Focused tests cover publication preservation, secret-safe summaries, scoped row grouping, schedules, campus, credits, availability, explicit unknowns, and model invariants. Phases G-J remain unimplemented. Do not silently expand a single-course export into a complete catalog or production import.
+Phases A-G were implemented in September 2026. The worker validates and atomically publishes a versioned single-course snapshot; datapuller inspects and normalizes it offline, validates the persistence shape, and upserts one `archershub_offerings` document per exact provider/campus/session/course scope into an isolated DLSU development database. Focused tests cover publication preservation, secret-safe summaries, scoped row grouping, schedules, campus, credits, availability, explicit unknowns, model invariants, import idempotency, scope separation, pre-write validation, and failure preservation. Phases H-J remain unimplemented. Do not silently expand a single-course export into a complete catalog or production import.
 
 ## Product Decisions
 
@@ -294,14 +294,17 @@ Acceptance is complete: mapper/model tests establish deterministic scoped sectio
 
 ## Phase G: Isolated DLSU Import
 
-1. Import normalized documents into the `archershub_offerings` collection in an explicitly isolated DLSU development database first.
-2. Validate the complete intended scope before writes and preserve retrieval provenance.
-3. Use transactions/staging appropriate to the existing deployment; publish atomically at the exact declared scope.
-4. Never feed a one-course snapshot into a term-wide replacement job.
-5. Repeated import is idempotent. Partial/failed import leaves the previous good scope intact and exits nonzero.
-6. Do not delete Berkeley records or reset databases without explicit owner approval. DLSU-only is the destination policy, not permission for destructive cleanup.
+Status: implemented in September 2026. `apps/datapuller/src/archershub-import.ts` reads a snapshot, normalizes it, validates the document offline with `ArchersHubOfferingModel`, then performs one `findOneAndReplace` upsert filtered by the exact provider/campus/session/course scope. The single-document replace is the atomic publish; no transaction is needed and no delete, drop, or term-wide operation exists in the importer. Run it against an explicitly isolated DLSU development database first:
 
-Acceptance: two identical imports produce no duplicates; controlled failure does not erase valid records; different terms/courses cannot overwrite each other.
+```sh
+npm run archershub:import --workspace=datapuller -- \
+  --input /path/to/latest.json \
+  --mongodb-uri 'mongodb://localhost:3008/tafttime_dlsu_dev?directConnection=true'
+```
+
+`MONGODB_URI` is used when `--mongodb-uri` is omitted. The command exits nonzero on invalid snapshots, validation failures, or persistence errors, leaving the previous document for that scope intact. It never touches Berkeley collections.
+
+Acceptance is covered offline: identical imports produce no duplicates, different courses/scopes stay separate, invalid bundles are rejected before any database call, and a simulated persistence failure preserves the previous document.
 
 ## Phase H: Catalog And API Integration
 
