@@ -56,14 +56,14 @@ Watch mode is opt-in and keeps retrying without writing application data:
 export NTFY_TOPIC=your-private-topic
 npm run start -- \
   --watch \
-  --interval-seconds 900 \
+  --interval-seconds 300 \
   --cdp http://127.0.0.1:9222 \
   --course STSWENG \
   --login \
   --google-account example@dlsu.edu.ph
 ```
 
-`NTFY_TOPIC` is optional in development but should be set for unattended operation. Optional settings are `NTFY_SERVER` (defaults to `https://ntfy.sh`) and `NTFY_TOKEN` for an authenticated ntfy topic. Use a private, unguessable topic and do not put the topic or token in source control. If using a self-hosted ntfy server, set `NTFY_SERVER` to its HTTPS URL.
+The default watch interval is five minutes. `NTFY_TOPIC` is optional in development but should be set for unattended operation. Optional settings are `NTFY_SERVER` (defaults to `https://ntfy.sh`) and `NTFY_TOKEN` for an authenticated ntfy topic. Use a private, unguessable topic and do not put the topic or token in source control. If using a self-hosted ntfy server, set `NTFY_SERVER` to its HTTPS URL.
 
 The worker sends one notification when it enters a new state:
 
@@ -90,12 +90,37 @@ Attached to Chrome.
 Course Finder authentication: authenticated
 Course offerings: 2772
 Matched course: STSWENG - ADVANCED SOFTWARE ENGINEERING (id 367)
-Selectable classes: 6
+Class rows: 6
 Sections: S06, S04, S05, S02, S03, S40
 Probe completed without modifying the attached browser.
 ```
 
 Counts and sections are live data and can change.
+
+## Private Snapshots
+
+Snapshot publication is opt-in. Use a worker-owned local directory on the Oracle host; no object-storage service is required:
+
+```sh
+install -d -m 700 /var/lib/tafttime/archershub
+npm run start -- \
+  --watch \
+  --interval-seconds 300 \
+  --snapshot-path /var/lib/tafttime/archershub/latest.json \
+  --login \
+  --google-account example@dlsu.edu.ph
+```
+
+The worker validates the complete single-course result before writing. It writes a temporary file in the same directory and atomically renames it to `latest.json`; the prior successful file becomes `previous.json`. Publication failures preserve `latest.json`, are reported as `PUBLICATION_FAILED`, and never trigger OAuth. The directory uses mode `700` and files use mode `600` where supported. Snapshots contain provider course/class records but no cookies, headers, browser state, or student profile data.
+
+Inspect a snapshot offline without MongoDB, CDP, provider access, or application secrets:
+
+```sh
+npm run archershub:inspect --workspace=datapuller -- \
+  --input /var/lib/tafttime/archershub/latest.json
+```
+
+The inspector rejects files larger than 10 MiB, malformed JSON, unsupported schemas, inconsistent IDs, and invalid rows. It prints only scope, retrieval time, and record counts. Readers must use `retrievedAt`; data older than 30 minutes should be shown as potentially outdated.
 
 Watch mode keeps one CDP connection, browser context, and active page across polling cycles. It does not reconnect to Chrome or select `context.pages()[0]` on every poll. If a provider/CDP error occurs, it attempts a fresh CDP connection and continues with the recovered page.
 
@@ -125,5 +150,7 @@ The logger is opt-in. Without `--log-dir` or `ARCHERSHUB_LOG_DIR`, no diagnostic
 - `PROVIDER_ERROR`: ArchersHub returned a non-success response.
 - `INVALID_RESPONSE`: the provider response shape changed.
 - `COURSE_NOT_FOUND`: the selected campus/session does not offer the requested prefix.
+- `AMBIGUOUS_COURSE`: more than one offering matched the requested prefix.
+- `PUBLICATION_FAILED`: data was fetched but the private snapshot could not be replaced; the prior file remains valid.
 
 Do not respond to failures by copying cookies, reading Chrome's `Cookies` database, or exposing CDP beyond localhost.

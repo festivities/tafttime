@@ -2,6 +2,9 @@
   "name": "archershub-worker",
   "private": true,
   "type": "module",
+  "exports": {
+    "./snapshot": "./src/snapshot.ts"
+  },
   "scripts": {
     "start": "tsx src/main.ts",
     "dev": "tsx watch src/main.ts",

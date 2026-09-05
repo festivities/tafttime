@@ -1,14 +1,23 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import {
+  type Browser,
+  type BrowserContext,
+  type Page,
+  chromium,
+} from "playwright";
 
 import {
   ARCHERSHUB_ORIGIN,
-  completeGoogleSignIn,
   type MfaPrompt,
+  completeGoogleSignIn,
 } from "./authentication";
 import { fetchCourseFinder, keepArchersHubSessionAlive } from "./course-finder";
-import { createNtfyNotifier, notifySafely, type Notifier } from "./notifier";
-import { errorCategory, type WorkerState } from "./state";
-import { createDiagnosticLogger, type DiagnosticLogger } from "./logger";
+import { type DiagnosticLogger, createDiagnosticLogger } from "./logger";
+import { type Notifier, createNtfyNotifier, notifySafely } from "./notifier";
+import {
+  createArchersHubSnapshot,
+  publishArchersHubSnapshot,
+} from "./snapshot";
+import { type WorkerState, errorCategory } from "./state";
 
 const COURSE_FINDER_REFRESH_MS = 20 * 60 * 1000;
 
@@ -64,7 +73,11 @@ async function runOnce(
     );
     return logResult(result, page);
   } catch (error) {
-    if (!login || !(error instanceof Error) || !error.message.includes("AUTHENTICATION_REQUIRED")) {
+    if (
+      !login ||
+      !(error instanceof Error) ||
+      !error.message.includes("AUTHENTICATION_REQUIRED")
+    ) {
       throw error;
     }
 
@@ -72,11 +85,20 @@ async function runOnce(
     const googleButton = page.locator("#btnGoogleSignIn");
     await googleButton.waitFor({ state: "visible", timeout: 15_000 });
     console.log("Clicking Continue with Google.");
-    console.log("Complete any password or phone approval in Chrome if prompted.");
+    console.log(
+      "Complete any password or phone approval in Chrome if prompted."
+    );
     await googleButton.click();
-    page = await completeGoogleSignIn(context, page, account, async (prompt) => {
-      await notifyMfaPrompt(notify, prompt);
-    }, 5 * 60_000, logger);
+    page = await completeGoogleSignIn(
+      context,
+      page,
+      account,
+      async (prompt) => {
+        await notifyMfaPrompt(notify, prompt);
+      },
+      5 * 60_000,
+      logger
+    );
 
     const result = await fetchCourseFinder(page, coursePrefix, logger, true);
     return logResult(result, page);
@@ -87,23 +109,24 @@ function logResult(
   result: Awaited<ReturnType<typeof fetchCourseFinder>>,
   page: Page
 ) {
-    const sections = result.classes
-      .map((row) => row.SECTION_NAME)
-      .filter((section): section is string => typeof section === "string");
+  const sections = result.classes
+    .map((row) => row.SECTION_NAME)
+    .filter((section): section is string => typeof section === "string");
 
-    console.log("Attached to Chrome.");
-    console.log("Course Finder authentication: authenticated");
-    console.log(`Course offerings: ${result.courses.length}`);
-    console.log(
-      `Matched course: ${result.matchedCourse.COURSE_NAME} (id ${result.matchedCourse.COURSE_CREATION_ID})`
-    );
-    console.log(`Selectable classes: ${result.classes.length}`);
-    console.log(`Sections: ${sections.join(", ") || "none"}`);
-    return {
-      courses: result.courses.length,
-      classes: result.classes.length,
-      page,
-    };
+  console.log("Attached to Chrome.");
+  console.log("Course Finder authentication: authenticated");
+  console.log(`Course offerings: ${result.courses.length}`);
+  console.log(
+    `Matched course: ${result.matchedCourse.COURSE_NAME} (id ${result.matchedCourse.COURSE_CREATION_ID})`
+  );
+  console.log(`Class rows: ${result.classes.length}`);
+  console.log(`Sections: ${sections.join(", ") || "none"}`);
+  return {
+    courses: result.courses.length,
+    classes: result.classes.length,
+    page,
+    result,
+  };
 }
 
 async function notifyMfaPrompt(
@@ -133,7 +156,8 @@ async function runWatch(
   account: string,
   intervalMs: number,
   notify: Notifier,
-  logger: DiagnosticLogger
+  logger: DiagnosticLogger,
+  snapshotPath?: string
 ): Promise<never> {
   let state: WorkerState | undefined;
   let loginAttemptedForIncident = false;
@@ -142,32 +166,37 @@ async function runWatch(
   let keepAliveInFlight = false;
   let connection = await connectPage(cdp);
 
-  setInterval(() => {
-    if (!activePage || keepAliveInFlight) return;
-    keepAliveInFlight = true;
-    keepArchersHubSessionAlive(activePage, logger)
-      .catch(async (error: unknown) => {
-        const nextState = errorCategory(error);
-        logger.error("session.keepalive_failed", { state: nextState });
-        if (nextState !== state) {
-          state = nextState;
-          loginAttemptedForIncident = nextState === "WAITING_FOR_REAUTHENTICATION";
-          await notifySafely(
-            notify,
-            `TaftTime: ${nextState}`,
-            nextState === "WAITING_FOR_REAUTHENTICATION"
-              ? "ArchersHub logged out during inactivity. Connect through RDP and complete Continue with Google; the worker will resume automatically."
-              : "ArchersHub session keepalive failed. The worker will retry automatically."
-          );
-        }
-      })
-      .finally(() => {
-        keepAliveInFlight = false;
-      });
-  }, 4 * 60 * 1000);
+  setInterval(
+    () => {
+      if (!activePage || keepAliveInFlight) return;
+      keepAliveInFlight = true;
+      keepArchersHubSessionAlive(activePage, logger)
+        .catch(async (error: unknown) => {
+          const nextState = errorCategory(error);
+          logger.error("session.keepalive_failed", { state: nextState });
+          if (nextState !== state) {
+            state = nextState;
+            loginAttemptedForIncident =
+              nextState === "WAITING_FOR_REAUTHENTICATION";
+            await notifySafely(
+              notify,
+              `TaftTime: ${nextState}`,
+              nextState === "WAITING_FOR_REAUTHENTICATION"
+                ? "ArchersHub logged out during inactivity. Connect through RDP and complete Continue with Google; the worker will resume automatically."
+                : "ArchersHub session keepalive failed. The worker will retry automatically."
+            );
+          }
+        })
+        .finally(() => {
+          keepAliveInFlight = false;
+        });
+    },
+    4 * 60 * 1000
+  );
 
   for (;;) {
-    const refreshPage = nextRefreshAt !== undefined && Date.now() >= nextRefreshAt;
+    const refreshPage =
+      nextRefreshAt !== undefined && Date.now() >= nextRefreshAt;
     try {
       const result = await runOnce(
         connection.context,
@@ -182,6 +211,13 @@ async function runWatch(
       activePage = result.page;
       if (!nextRefreshAt || refreshPage) {
         nextRefreshAt = Date.now() + COURSE_FINDER_REFRESH_MS;
+      }
+      if (snapshotPath) {
+        await publishArchersHubSnapshot(
+          createArchersHubSnapshot(result.result),
+          snapshotPath,
+          logger
+        );
       }
       if (state !== "AUTHENTICATED") {
         await notifySafely(
@@ -207,7 +243,9 @@ async function runWatch(
         const message =
           nextState === "WAITING_FOR_REAUTHENTICATION"
             ? "ArchersHub needs authentication. Connect through RDP, complete Continue with Google and any password/phone approval, then leave Chrome running."
-            : "ArchersHub or Chrome is unavailable. The worker will retry automatically.";
+            : nextState === "PUBLICATION_FAILED"
+              ? "ArchersHub data was fetched, but the private snapshot could not be published. The previous snapshot was preserved and the worker will retry."
+              : "ArchersHub or Chrome is unavailable. The worker will retry automatically.";
         await notifySafely(notify, `TaftTime: ${nextState}`, message);
       }
       state = nextState;
@@ -243,6 +281,7 @@ async function main(): Promise<void> {
   const account = argument("google-account", process.env.GOOGLE_ACCOUNT ?? "");
   const login = hasFlag("login");
   const watch = hasFlag("watch");
+  const snapshotPath = argument("snapshot-path", "") || undefined;
   const logger = createDiagnosticLogger(
     argument("log-dir", process.env.ARCHERSHUB_LOG_DIR ?? "") || undefined
   );
@@ -250,8 +289,9 @@ async function main(): Promise<void> {
     mode: watch ? "watch" : "once",
     cdp,
     coursePrefix,
-    intervalSeconds: numberArgument("interval-seconds", 900),
+    intervalSeconds: numberArgument("interval-seconds", 300),
     refreshSeconds: COURSE_FINDER_REFRESH_MS / 1000,
+    snapshotEnabled: Boolean(snapshotPath),
   });
 
   if (login && !account) {
@@ -271,15 +311,16 @@ async function main(): Promise<void> {
       coursePrefix,
       login,
       account,
-      numberArgument("interval-seconds", 900) * 1000,
+      numberArgument("interval-seconds", 300) * 1000,
       notify,
-      logger
+      logger,
+      snapshotPath
     );
     return;
   }
 
   const connection = await connectPage(cdp);
-  await runOnce(
+  const result = await runOnce(
     connection.context,
     connection.page,
     coursePrefix,
@@ -288,6 +329,13 @@ async function main(): Promise<void> {
     notify,
     logger
   );
+  if (snapshotPath) {
+    await publishArchersHubSnapshot(
+      createArchersHubSnapshot(result.result),
+      snapshotPath,
+      logger
+    );
+  }
   console.log("Probe completed without modifying the attached browser.");
 }
 

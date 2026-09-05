@@ -6,6 +6,7 @@ import {
   fetchCourseFinder,
   keepArchersHubSessionAlive,
   postForm,
+  selectCourse,
   validateClassRows,
   validateCourseList,
 } from "./course-finder";
@@ -77,7 +78,9 @@ test("recognizes ArchersHub's expired-session JSON sentinel", async () => {
       status: 200,
       url: "https://archershub.dlsu.edu.ph/CourseFinder/GetCourseList/",
       contentType: "application/json; charset=utf-8",
-      text: JSON.stringify("Object reference not set to an instance of an object."),
+      text: JSON.stringify(
+        "Object reference not set to an instance of an object."
+      ),
     }),
   } as unknown as Page;
 
@@ -99,9 +102,41 @@ test("allows a valid empty class response", () => {
 });
 
 test("rejects malformed course lists", () => {
-  assert.throws(() => validateCourseList({ CourseDrp: [{ COURSE_NAME: "bad" }] }));
+  assert.throws(() =>
+    validateCourseList({ CourseDrp: [{ COURSE_NAME: "bad" }] })
+  );
+  assert.throws(() => validateCourseList(null));
+  assert.throws(() => validateCourseList("bad"));
 });
 
 test("rejects non-array class responses", () => {
   assert.throws(() => validateClassRows({ error: "login" }));
+  assert.throws(() => validateClassRows([null]));
+  assert.throws(() => validateClassRows([[]]));
+});
+
+test("rejects ambiguous case-insensitive course prefixes", () => {
+  const courses = [
+    { COURSE_CREATION_ID: 1, COURSE_NAME: "CCPROG1 - FIRST" },
+    { COURSE_CREATION_ID: 2, COURSE_NAME: "CCPROG1A - SECOND" },
+  ];
+  assert.throws(() => selectCourse(courses, "ccprog1"), /AMBIGUOUS_COURSE/);
+  assert.equal(selectCourse([courses[0]], "ccprog1"), courses[0]);
+});
+
+test("classifies explicit 401 and 403 responses as authentication failures", async () => {
+  for (const status of [401, 403]) {
+    const page = {
+      evaluate: async () => ({
+        status,
+        url: "https://archershub.dlsu.edu.ph/CourseFinder/GetCourseList/",
+        contentType: "application/json",
+        text: "{}",
+      }),
+    } as unknown as Page;
+    await assert.rejects(
+      postForm(page, "/CourseFinder/GetCourseList/", {}),
+      /AUTHENTICATION_REQUIRED/
+    );
+  }
 });

@@ -13,3 +13,10 @@ test("classifies authentication failures separately", () => {
 test("classifies other failures as provider outages", () => {
   assert.equal(errorCategory(new Error("ECONNRESET")), "PROVIDER_UNAVAILABLE");
 });
+
+test("classifies snapshot failures separately", () => {
+  assert.equal(
+    errorCategory(new Error("PUBLICATION_ERROR: disk full")),
+    "PUBLICATION_FAILED"
+  );
+});

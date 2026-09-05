@@ -53,14 +53,21 @@ export async function postForm<T>(
     { path, form }
   );
 
-  if (isLoginUrl(response.url) || /text\/html/i.test(response.contentType)) {
+  if (
+    response.status === 401 ||
+    response.status === 403 ||
+    isLoginUrl(response.url) ||
+    /text\/html/i.test(response.contentType)
+  ) {
     logger?.warn("provider.authentication_required", {
       path,
       status: response.status,
       contentType: response.contentType,
       durationMs: Date.now() - started,
     });
-    throw new Error("AUTHENTICATION_REQUIRED: ArchersHub returned the login page");
+    throw new Error(
+      "AUTHENTICATION_REQUIRED: ArchersHub returned the login page"
+    );
   }
   if (response.status < 200 || response.status >= 300) {
     logger?.warn("provider.http_error", {
@@ -90,37 +97,75 @@ export async function postForm<T>(
       path,
       reason: "expired_session_context",
     });
-    throw new Error("AUTHENTICATION_REQUIRED: ArchersHub session context expired");
+    throw new Error(
+      "AUTHENTICATION_REQUIRED: ArchersHub session context expired"
+    );
   }
   return value as T;
 }
 
-export function validateCourseList(value: CourseListResponse): Course[] {
-  if (!Array.isArray(value.CourseDrp)) {
+export function validateCourseList(value: unknown): Course[] {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !Array.isArray((value as CourseListResponse).CourseDrp)
+  ) {
     throw new Error("INVALID_RESPONSE: CourseDrp was not an array");
   }
 
+  const courses = (value as { CourseDrp: unknown[] }).CourseDrp;
+
   if (
-    value.CourseDrp.some(
+    courses.some(
       (course) =>
         !course ||
         typeof course !== "object" ||
         typeof (course as Course).COURSE_NAME !== "string" ||
-        (typeof (course as Course).COURSE_CREATION_ID !== "number" &&
-          typeof (course as Course).COURSE_CREATION_ID !== "string")
+        !(course as Course).COURSE_NAME.trim() ||
+        (typeof (course as Course).COURSE_CREATION_ID === "number"
+          ? !Number.isSafeInteger((course as Course).COURSE_CREATION_ID) ||
+            Number((course as Course).COURSE_CREATION_ID) < 0
+          : typeof (course as Course).COURSE_CREATION_ID !== "string" ||
+            !String((course as Course).COURSE_CREATION_ID).trim())
     )
   ) {
     throw new Error("INVALID_RESPONSE: CourseDrp contained an invalid course");
   }
 
-  return value.CourseDrp as Course[];
+  return courses as Course[];
 }
 
 export function validateClassRows(value: unknown): ClassRow[] {
   if (!Array.isArray(value)) {
     throw new Error("INVALID_RESPONSE: GetCFData did not return an array");
   }
+  if (
+    value.some((row) => !row || typeof row !== "object" || Array.isArray(row))
+  ) {
+    throw new Error("INVALID_RESPONSE: GetCFData contained an invalid row");
+  }
   return value as ClassRow[];
+}
+
+export function selectCourse(courses: Course[], coursePrefix: string): Course {
+  const normalizedPrefix = coursePrefix.trim().toUpperCase();
+  if (!normalizedPrefix) {
+    throw new Error("COURSE_NOT_FOUND: course prefix was empty");
+  }
+  const matches = courses.filter((course) =>
+    course.COURSE_NAME.toUpperCase().startsWith(normalizedPrefix)
+  );
+  if (matches.length === 0) {
+    throw new Error(
+      `COURSE_NOT_FOUND: no offering starts with ${coursePrefix}`
+    );
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `AMBIGUOUS_COURSE: multiple offerings start with ${coursePrefix}`
+    );
+  }
+  return matches[0];
 }
 
 export async function fetchCourseFinder(
@@ -157,9 +202,9 @@ export async function fetchCourseFinder(
         waitUntil: "domcontentloaded",
       });
     }
-    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(
-      () => undefined
-    );
+    await page
+      .waitForLoadState("networkidle", { timeout: 15_000 })
+      .catch(() => undefined);
     if (isLoginUrl(page.url())) break;
     try {
       await campus.waitFor({
@@ -207,24 +252,29 @@ export async function fetchCourseFinder(
   }
 
   const list = validateCourseList(
-    await postForm<CourseListResponse>(page, "/CourseFinder/GetCourseList/", {
-      Campusno: selection.campus,
-      AcademicSession: selection.academicSession,
-    }, logger)
+    await postForm<CourseListResponse>(
+      page,
+      "/CourseFinder/GetCourseList/",
+      {
+        Campusno: selection.campus,
+        AcademicSession: selection.academicSession,
+      },
+      logger
+    )
   );
-  const matchedCourse = list.find((course) =>
-    course.COURSE_NAME.toUpperCase().startsWith(coursePrefix.toUpperCase())
-  );
-  if (!matchedCourse) {
-    throw new Error(`COURSE_NOT_FOUND: no offering starts with ${coursePrefix}`);
-  }
+  const matchedCourse = selectCourse(list, coursePrefix);
 
   const classes = validateClassRows(
-    await postForm<ClassRow[]>(page, "/CourseFinder/GetCFData/", {
-      Campusno: selection.campus,
-      AcademicSession: selection.academicSession,
-      Courseid: String(matchedCourse.COURSE_CREATION_ID),
-    }, logger)
+    await postForm<ClassRow[]>(
+      page,
+      "/CourseFinder/GetCFData/",
+      {
+        Campusno: selection.campus,
+        AcademicSession: selection.academicSession,
+        Courseid: String(matchedCourse.COURSE_CREATION_ID),
+      },
+      logger
+    )
   );
 
   return {

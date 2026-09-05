@@ -6,7 +6,8 @@ This directory records the live investigation of DLSU ArchersHub and the Crossbo
 
 - `authentication.md` — current sign-in flow, Google sign-in implications, session observations, and recommended architecture.
 - `course-finder.md` — verified Course Finder page flow and the two requested endpoint contracts.
-- `implementation-plan.md` — staged plan for integrating an authenticated browser worker into TaftTime.
+- `../IMPLEMENTATION_PLAN.md` — current TaftTime execution status and remaining integration phases.
+- `../../apps/archershub-worker/README.md` — worker operation, private snapshot publication, and offline inspection runbook.
 
 ## Important Boundary
 

@@ -6,7 +6,7 @@ Owner-approved planning baseline: September 2026. This is a temporary handoff fo
 
 The authenticated ArchersHub worker is already implemented. Its twenty-minute reload strategy survived an observed ninety-minute unattended run without post-startup reauthentication. Do not restart authentication research or claim indefinite session lifetime from that observation.
 
-Execute Phases A-E first. Later phases require the explicitly identified domain decisions and acceptance checks. Do not silently expand a single-course export into a complete catalog or production import.
+Phases A-E were implemented in September 2026: the worker now validates and atomically publishes a versioned single-course snapshot, datapuller can inspect it offline through the shared contract, provider boundaries reject malformed/ambiguous responses, and focused tests cover publication preservation and secret-safe summaries. Later phases remain unimplemented. Do not silently expand a single-course export into a complete catalog or production import.
 
 ## Product Decisions
 
@@ -58,7 +58,6 @@ The immediate milestone ends at offline snapshot consumption. It must not write 
 - .agents/AGENTS.md
 - .agents/ArchersHub/authentication.md
 - .agents/ArchersHub/course-finder.md
-- .agents/ArchersHub/implementation-plan.md (historical roadmap; this file supplies the current execution scope)
 - apps/archershub-worker/src/{main,authentication,course-finder,types,logger,state}.ts
 - apps/archershub-worker/src/*.test.ts and README.md
 - apps/datapuller/src/main.ts and src/shared/config.ts
@@ -137,7 +136,7 @@ Acceptance: tests cover malformed provider data, unique/ambiguous prefix selecti
 
 Files: worker main.ts, snapshot.ts, tests, README.md.
 
-Add opt-in --snapshot-path /private/path/archershub-latest.json. Without the argument preserve current behavior.
+Add opt-in --snapshot-path /private/path/latest.json. Without the argument preserve current behavior.
 
 1. Fetch and validate both endpoint responses before publication.
 2. Construct and validate the versioned snapshot.
@@ -351,6 +350,6 @@ None of these block the approved initial deployment:
 
 ## Implementing-Agent Instructions
 
-Execute A-E first, preserving authentication and existing unrelated behavior. Do not perform production writes or resolve domain questions by guessing. After the first handoff, execute later phases only once their mapping decisions are approved. Prefer existing dependencies, native filesystem operations, and small functions over services/frameworks.
+Phases A-E are complete. Preserve authentication and existing unrelated behavior while continuing. Do not perform production writes or resolve domain questions by guessing. Execute later phases only once their mapping decisions are implemented and verified. Prefer existing dependencies, native filesystem operations, and small functions over services/frameworks.
 
 For each phase report changed files, exact commands, tests/results, acceptance evidence, and remaining limitations. Keep this plan updated as work completes. Preserve durable decisions in AGENTS.md before the owner considers the implementation fully done and this temporary plan is scrubbed.
